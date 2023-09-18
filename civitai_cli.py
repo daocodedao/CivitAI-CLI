@@ -7,6 +7,7 @@ import subprocess
 from bs4 import BeautifulSoup
 from html import unescape
 from tqdm import tqdm
+from termcolor import colored
 
 BASE_URL = "https://civitai.com/api/v1/models"
 MAX_LINE_WIDTH = 80
@@ -319,11 +320,11 @@ class CivitaiCLI:
     def main_menu(self):
         while True:
             print("\n--- Civitai CLI Tool ---")
-            print("1. List and filter models")
-            print("2. Fetch model by ID")
-            print("3. Download model by ID")
-            print("4. Settings")
-            print("5. Exit")
+            print("1. " + colored("List and filter models", 'cyan'))
+            print("2. " + colored("Fetch model by ID", 'cyan'))
+            print("3. " + colored("Download model by ID", 'cyan'))
+            print("4. " + colored("Settings", 'cyan'))
+            print("5. " + colored("Exit", 'yellow'))
             choice = input("Enter your choice: ")
 
             if choice == '1':
@@ -356,11 +357,12 @@ class CivitaiCLI:
     def settings_menu(self):
         while True:
             print("\n--- Settings ---")
-            print("1. Change display mode (Currently:", self.display_mode, ")")
-            size_options = ", ".join([f"{key} ({val}) - '{initial}'" for key, val, initial in zip(self.SIZE_MAPPINGS.keys(), self.SIZE_MAPPINGS.values(), ['s', 'm', 'l'])])
-            print(f"2. Adjust image size (Currently: {self.image_size}) - Options: {size_options}")
-            print("3. Back to main menu")
+            print("1. Change display mode (" + colored(f"{self.display_mode}", 'cyan') + ")")
+            size_options = ", ".join([f"{key} ({colored(val, 'cyan')}) - '{initial}'" for key, val, initial in zip(self.SIZE_MAPPINGS.keys(), self.SIZE_MAPPINGS.values(), ['s', 'm', 'l'])])
+            print(f"2. Adjust image size (Currently: {colored(self.image_size, 'green')}) - Options: {size_options}")
+            print("3. " + colored("Back to main menu", 'yellow'))
             choice = input("Enter your choice: ")
+
 
             if choice == '1':
                 self.toggle_display_mode()
@@ -381,7 +383,7 @@ class CivitaiCLI:
             'm': 'medium',
             'l': 'large'
         }
-        choice = input("Enter desired image size (s for small, m for medium, l for large): ").lower()
+        choice = input("Enter desired image size (" + colored("s", 'cyan') + " for small, " + colored("m", 'cyan') + " for medium, " + colored("l", 'cyan') + " for large): ").lower()
 
         if choice in size_choices:
             self.image_size = self.SIZE_MAPPINGS[size_choices[choice]]
