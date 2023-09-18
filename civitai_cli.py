@@ -10,8 +10,15 @@ from tqdm import tqdm
 
 BASE_URL = "https://civitai.com/api/v1/models"
 MAX_LINE_WIDTH = 80
+SETTINGS_FILE = "civitai_settings.json"
 
 class CivitaiCLI:
+    SIZE_MAPPINGS = {
+        'small': '30x25',
+        'medium': '60x50',
+        'large': '120x100'
+    }
+
     def __init__(self):
         self.api_token = os.environ.get("CIVITAI_API_KEY")
         if not self.api_token:
@@ -20,8 +27,10 @@ class CivitaiCLI:
         self.current_params = {}
         self.current_base_model = None
         self.current_page = 1
-        self.display_mode = "text"  # default is text-only mode
-
+        self.display_mode = "text"
+        self.image_size = self.SIZE_MAPPINGS['medium']
+        self.load_settings()
+        
     def toggle_display_mode(self):
         self.display_mode = "images" if self.display_mode == "text" else "text"
         print(f"Switched display mode to {self.display_mode}.")
@@ -124,7 +133,7 @@ class CivitaiCLI:
 
         return lines
 
-    def display_model_details(self, model, desired_image_width=60, desired_image_height=50):
+    def display_model_details(self, model):
         print("\n" + "-"*40)
         print(f"ID: {model['id']} | Name: {model['name']} | Type: {model['type']}")
         print(f"Creator: {model['creator']['username']} | Avatar URL: {model['creator']['image']}")
@@ -132,10 +141,12 @@ class CivitaiCLI:
         # Retrieve model image URL
         model_image_url = model['modelVersions'][0]['images'][0]['url'] if 'modelVersions' in model and model['modelVersions'] and 'images' in model['modelVersions'][0] and model['modelVersions'][0]['images'] else None
 
-        # Display model image using imgcat with fixed size
+        # Parse the image_size attribute
+        desired_image_width, desired_image_height = map(int, self.image_size.split('x'))
+
+        # Display model image using imgcat with user-defined size
         if self.display_mode == "images" and model_image_url:
             os.system(f'imgcat --width={desired_image_width} --height={desired_image_height} {model_image_url}')
-
 
         # Ensure that a default value is used if description is missing or None
         description_html = model.get('description', '') or ''
@@ -277,12 +288,7 @@ class CivitaiCLI:
                         print(f"No models found for base model: {base_model_selected}")
                 else:
                     print("Invalid choice.")
-        # The below lines are redundant since we already displayed the models above
-        # else:
-        #     for model in models:
-        #         self.display_model_details(model)
 
-        # Prompt the user for the next action
         action_prompt = f"Do you want to filter again or look on the next page? (y/n/{self.current_page + 1}/d): "
         action = input(action_prompt).lower()
 
@@ -316,7 +322,7 @@ class CivitaiCLI:
             print("1. List and filter models")
             print("2. Fetch model by ID")
             print("3. Download model by ID")
-            print("4. Change display mode (Currently:", self.display_mode, ")")
+            print("4. Settings")
             print("5. Exit")
             choice = input("Enter your choice: ")
 
@@ -338,7 +344,7 @@ class CivitaiCLI:
                 self.download_models_with_aria(model_ids, output_path)
 
             elif choice == '4':
-                self.toggle_display_mode()
+                self.settings_menu()
 
             elif choice == '5':
                 print("Goodbye!")
@@ -346,6 +352,68 @@ class CivitaiCLI:
 
             else:
                 print("Invalid choice. Please try again.")
+
+    def settings_menu(self):
+        while True:
+            print("\n--- Settings ---")
+            print("1. Change display mode (Currently:", self.display_mode, ")")
+            size_options = ", ".join([f"{key} ({val}) - '{initial}'" for key, val, initial in zip(self.SIZE_MAPPINGS.keys(), self.SIZE_MAPPINGS.values(), ['s', 'm', 'l'])])
+            print(f"2. Adjust image size (Currently: {self.image_size}) - Options: {size_options}")
+            print("3. Back to main menu")
+            choice = input("Enter your choice: ")
+
+            if choice == '1':
+                self.toggle_display_mode()
+
+            elif choice == "2":
+                self.set_image_size() 
+
+            elif choice == '3':
+                return
+
+            else:
+                print("Invalid choice. Please try again.")
+
+
+    def set_image_size(self):
+        size_choices = {
+            's': 'small',
+            'm': 'medium',
+            'l': 'large'
+        }
+        choice = input("Enter desired image size (s for small, m for medium, l for large): ").lower()
+
+        if choice in size_choices:
+            self.image_size = self.SIZE_MAPPINGS[size_choices[choice]]
+            # Assuming you have a save_settings method, if not, you can comment this line out.
+            self.save_settings()  
+            print(f"Image size set to: {self.image_size}")
+        else:
+            print("Invalid choice. Please choose a valid image size.")
+
+
+
+    def load_settings(self):
+        size_mappings = {
+            'small': '30x25',
+            'medium': '60x50',
+            'large': '120x100'
+        }
+        
+        if os.path.exists(SETTINGS_FILE):
+            with open(SETTINGS_FILE, 'r') as file:
+                settings = json.load(file)
+                self.display_mode = settings.get('display_mode', 'text')  # default to 'text'
+                self.image_size = settings.get('image_size', self.SIZE_MAPPINGS['medium'])
+
+
+    def save_settings(self):
+        settings = {
+            'display_mode': self.display_mode,
+            'image_size': self.image_size
+        }
+        with open(SETTINGS_FILE, 'w') as file:
+            json.dump(settings, file)
 
 
     def run(self):
