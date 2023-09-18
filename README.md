@@ -22,7 +22,7 @@ CivitAI-CLI is a command-line interface tool designed to interact with the Civit
 To install and use CivitAI-CLI, clone this repository and ensure you have all the necessary dependencies installed.
 
 ```bash
-git clone <https://github.com/roadmaus/CivitAI-CLI.git>
+git clone https://github.com/roadmaus/CivitAI-CLI.git
 pip install -r requirements.txt
 ```
 
