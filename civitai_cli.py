@@ -373,11 +373,27 @@ class CivitaiCLI:
             self.list_all_models(api_token)
         elif action == 'd':
             model_id = int(input("Enter model ID you want to download: "))
+
+            # Fetch model details to get the versions
+            model_details = self.fetch_model_by_id(model_id)
+            versions = model_details.get('modelVersions', [])
+
+            # Prompt user to select which versions to download
+            print("Select version(s) by entering the corresponding numbers (separate multiple choices with a comma):")
+            for idx, version in enumerate(versions, 1):
+                print(f"{idx}. {version.get('name', 'Unknown_Version')}")
+            
+            selected_indices = input().split(",")
+            chosen_versions = [versions[int(idx)-1] for idx in selected_indices]
+
             default_path = os.path.expanduser("~/downloads")
             output_path = input(f"Enter path to download the model (or press enter, default location is {default_path}): ")
             if not output_path:
                 output_path = default_path
-            self.download_models_with_aria([model_id], output_path)
+
+            # Call the download_models_with_aria method
+            self.download_models_with_aria(str(model_id), [chosen_versions], output_path)
+
             # After downloading, prompt the user for the next action again
             action = input(action_prompt).lower()
             if action == str(self.current_page + 1):
