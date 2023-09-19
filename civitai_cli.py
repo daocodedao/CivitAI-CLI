@@ -74,46 +74,118 @@ class CivitaiCLI:
             print("Error fetching models:", response.status_code)
             return []
 
-    def fetch_model_by_id(self, model_id):
-        response = requests.get(f"{BASE_URL}/{model_id}")
+    def fetch_model_by_id(self, model_id, primaryFileOnly=False):
+        url = f"{BASE_URL}/{model_id}"
+        params = {}
+        if primaryFileOnly:
+            params['primaryFileOnly'] = 'true'
+        response = requests.get(url, params=params)
         if response.status_code == 200:
             return response.json()
         else:
             print("Error fetching model:", response.status_code)
             return {}
 
-    def get_model_download_url(self, model_id):
+    def get_model_download_url(self, model_id, version_index=None):
         model_details = self.fetch_model_by_id(model_id)
         model_versions = model_details.get("modelVersions", [])
+        
         if not model_versions:
             print("No model versions found for the model.")
             return None
 
-        download_url = model_versions[0].get("downloadUrl")
+        # If a specific version index is given, fetch that version's download URL.
+        if version_index is not None:
+            chosen_version = model_versions[version_index]
+            download_url = chosen_version.get("downloadUrl")
+        else:
+            # Default behavior: fetch the first version's download URL.
+            download_url = model_versions[0].get("downloadUrl")
+            
         if not download_url:
             print("No download URL found for the model version.")
             return None
 
         return download_url
 
-    def download_models_with_aria(self, model_ids, output_path):
-        for model_id in model_ids:
+    def choose_model_version(self, model):
+        model_versions = model.get('modelVersions', [])
+
+        if not model_versions:
+            print("No model versions found for the model.")
+            return []
+
+        print(f"\nModel: {model.get('name', 'Unknown_Model')}")
+        print("Available Versions:")
+
+        for idx, version in enumerate(model_versions):
+            print(f"{idx + 1}. {version.get('name', 'Unknown_Version')} (Created at: {version.get('createdAt', 'Unknown Date')})")
+
+        print(f"{len(model_versions) + 1}. Download All Versions")
+
+        choice = input("\nEnter the number of the version you want to download (or choose 'Download All Versions'): ")
+
+        try:
+            choice = int(choice)
+            if choice == len(model_versions) + 1:
+                return model_versions
+            elif 1 <= choice <= len(model_versions):
+                return [model_versions[choice - 1]]
+            else:
+                print("Invalid choice.")
+                return []
+        except ValueError:
+            print("Invalid input. Please enter a number.")
+            return []
+
+    def download_models_with_aria(self, model_ids_str, chosen_versions, output_path):
+        model_ids = [int(id.strip()) for id in model_ids_str.split(',')]
+        
+        for idx, model_id in enumerate(model_ids):
             model_details = self.fetch_model_by_id(model_id)
             model_name = model_details.get('name', 'Unknown_Model')
 
-            # Loop through all model versions
-            for version in model_details.get('modelVersions', []):
+            # Ensure the model name is file-safe
+            safe_model_name = "".join([c for c in model_name if c.isalpha() or c.isdigit() or c==' ']).rstrip()
+
+            # Loop through only the chosen versions
+            for version in chosen_versions[idx]:
                 version_name = version.get('name', 'Unknown_Version')
                 download_url = version.get('downloadUrl')
 
+                # Ensure the version name is file-safe
+                safe_version_name = "".join([c for c in version_name if c.isalpha() or c.isdigit() or c==' ']).rstrip()
+
+                # Combine model name and version name for a unique file name
+                combined_name = f"{safe_model_name}_{safe_version_name}"
+
+                # Download Model
                 if download_url:
                     print(f"Downloading model: {model_name} - Version: {version_name}...")
-                    cmd = f'aria2c "{download_url}" --dir="{output_path}" --check-certificate=false --content-disposition-default-utf8=true'
+                    cmd = f'aria2c "{download_url}" --dir="{output_path}" --out="{combined_name}.safetensors" --check-certificate=false --content-disposition-default-utf8=true'
                     subprocess.run(cmd, shell=True)
 
-        print("All downloads completed!")
-    # 3. Display and Formatting
+                # Download Image
+                images = version.get('images', [])
+                if images:
+                    image_url = images[0].get('url')
+                    if image_url:
+                        print(f"Downloading image for model: {model_name} - Version: {version_name}...")
+                        cmd = f'aria2c "{image_url}" --dir="{output_path}" --check-certificate=false --content-disposition-default-utf8=true'
+                        subprocess.run(cmd, shell=True)
 
+                        # Rename the image
+                        original_image_name = os.path.basename(image_url.split("?")[0])  # Split to handle possible query parameters
+                        os.rename(os.path.join(output_path, original_image_name), os.path.join(output_path, f"{combined_name}.jpeg"))
+
+                # Save Metadata directly with desired name
+                with open(os.path.join(output_path, f"{combined_name}.json"), "w") as metadata_file:
+                    json.dump(version, metadata_file, indent=4)
+
+        print("All downloads completed!")
+
+
+    # 3. Display and Formatting
     def split_text_into_lines(self, text, max_width):
         words = text.split()
         lines = []
@@ -205,7 +277,7 @@ class CivitaiCLI:
         # Interactive filtering preferences
         params = {}
         if self.current_page == 1:
-            params['limit'] = int(input("Enter number of results per page (1-100, default 100): ") or 100)
+            params['limit'] = int(input("Enter number of results per page (1-100, default 25): ") or 25)
             params['query'] = input("Filter by name (leave blank for none): ")
             params['tag'] = input("Filter by tag (leave blank for none): ")
             params['username'] = input("Filter by creator username (leave blank for none): ")
@@ -222,12 +294,12 @@ class CivitaiCLI:
             params['period'] = input("Time frame for sorting (AllTime, Year, Month, Week, Day, leave blank for default): ")
             rating_input = input("Filter by rating (leave blank for any): ")
             params['rating'] = float(rating_input) if rating_input else None
-            nsfw_input = input("Filter by NSFW? (all/nsfw/sfw, default is all): ").lower()
+            nsfw_input = input("Filter by NSFW? (all/nsfw/sfw, default is sfw): ").lower() or 'sfw'
             if nsfw_input == 'nsfw':
                 params['nsfw'] = True
-            elif nsfw_input == 'sfw':
+            elif nsfw_input == 'sfw' or not nsfw_input:
                 params['nsfw'] = False
-            
+
             # Remove None values
             params = {k: v for k, v in params.items() if v is not None}
             
@@ -301,11 +373,27 @@ class CivitaiCLI:
             self.list_all_models(api_token)
         elif action == 'd':
             model_id = int(input("Enter model ID you want to download: "))
+
+            # Fetch model details to get the versions
+            model_details = self.fetch_model_by_id(model_id)
+            versions = model_details.get('modelVersions', [])
+
+            # Prompt user to select which versions to download
+            print("Select version(s) by entering the corresponding numbers (separate multiple choices with a comma):")
+            for idx, version in enumerate(versions, 1):
+                print(f"{idx}. {version.get('name', 'Unknown_Version')}")
+            
+            selected_indices = input().split(",")
+            chosen_versions = [versions[int(idx)-1] for idx in selected_indices]
+
             default_path = os.path.expanduser("~/downloads")
             output_path = input(f"Enter path to download the model (or press enter, default location is {default_path}): ")
             if not output_path:
                 output_path = default_path
-            self.download_models_with_aria([model_id], output_path)
+
+            # Call the download_models_with_aria method
+            self.download_models_with_aria(str(model_id), [chosen_versions], output_path)
+
             # After downloading, prompt the user for the next action again
             action = input(action_prompt).lower()
             if action == str(self.current_page + 1):
@@ -319,7 +407,7 @@ class CivitaiCLI:
 
     def main_menu(self):
         while True:
-            print("\n--- Civitai CLI Tool ---")
+            print("\\n--- Civitai CLI Tool ---")
             print("1. " + colored("List and filter models", 'cyan'))
             print("2. " + colored("Fetch model by ID", 'cyan'))
             print("3. " + colored("Download model by ID", 'cyan'))
@@ -338,11 +426,28 @@ class CivitaiCLI:
             elif choice == '3':
                 model_ids_input = input("Enter model IDs to download (comma separated): ")
                 model_ids = [int(id.strip()) for id in model_ids_input.split(",")]
+
+                all_chosen_versions = []
+
+                for model_id in model_ids:
+                    # If there are multiple model_ids, download only the primary version
+                    if len(model_ids) > 1:
+                        model = self.fetch_model_by_id(model_id, primaryFileOnly=True)
+                        chosen_versions = [model]  # Assuming the primary model itself has the necessary details
+                    else:
+                        model = self.fetch_model_by_id(model_id)
+                        chosen_versions = self.choose_model_version(model)
+
+                    all_chosen_versions.append(chosen_versions)
+
+                # Determine the output path
                 default_path = os.path.expanduser("~/downloads")
-                output_path = input(f"Enter path to download the models (or press enter, default location is {default_path}): ")
+                output_path = input(f"Enter path to download the models (or press enter, default location is {{default_path}}): ")
                 if not output_path:
                     output_path = default_path
-                self.download_models_with_aria(model_ids, output_path)
+
+                # Download the chosen versions
+                self.download_models_with_aria(','.join(map(str, model_ids)), all_chosen_versions, output_path)
 
             elif choice == '4':
                 self.settings_menu()
@@ -396,17 +501,17 @@ class CivitaiCLI:
 
 
     def load_settings(self):
-        size_mappings = {
-            'small': '30x25',
-            'medium': '60x50',
-            'large': '120x100'
-        }
-        
         if os.path.exists(SETTINGS_FILE):
-            with open(SETTINGS_FILE, 'r') as file:
-                settings = json.load(file)
-                self.display_mode = settings.get('display_mode', 'text')  # default to 'text'
-                self.image_size = settings.get('image_size', self.SIZE_MAPPINGS['medium'])
+            try:
+                with open(SETTINGS_FILE, 'r') as file:
+                    settings = json.load(file)
+                    self.display_mode = settings.get('display_mode', 'text')
+                    self.image_size = settings.get('image_size', self.SIZE_MAPPINGS['medium'])
+            except json.JSONDecodeError:
+                print(f"Error decoding {SETTINGS_FILE}. Please ensure it's in valid JSON format.")
+            except Exception as e:
+                print(f"Error reading from {SETTINGS_FILE}: {e}")
+
 
 
     def save_settings(self):
