@@ -9,6 +9,8 @@ from html import unescape
 from tqdm import tqdm
 from termcolor import colored
 
+import inquirer
+
 BASE_URL = "https://civitai.com/api/v1/models"
 MAX_LINE_WIDTH = 80
 SETTINGS_FILE = "civitai_settings.json"
@@ -407,96 +409,93 @@ class CivitaiCLI:
 
     def main_menu(self):
         while True:
-            print("\\n--- Civitai CLI Tool ---")
-            print("1. " + colored("List and filter models", 'cyan'))
-            print("2. " + colored("Fetch model by ID", 'cyan'))
-            print("3. " + colored("Download model by ID", 'cyan'))
-            print("4. " + colored("Settings", 'cyan'))
-            print("5. " + colored("Exit", 'yellow'))
-            choice = input("Enter your choice: ")
+            questions = [
+                inquirer.List('choice',
+                              message="--- Civitai CLI Tool ---",
+                              choices=['List and filter models', 'Fetch model by ID', 'Download model by ID', 'Settings', 'Exit'],
+                              carousel=True  # for better navigation
+                              ),
+            ]
+            answers = inquirer.prompt(questions)
+            choice = answers['choice']
 
-            if choice == '1':
+            if choice == 'List and filter models':
                 self.list_all_models(self.api_token)
 
-            elif choice == '2':
+            elif choice == 'Fetch model by ID':
                 model_id = int(input("Enter model ID: "))
                 model = self.fetch_model_by_id(model_id)
                 self.display_model_details(model)
 
-            elif choice == '3':
+            elif choice == 'Download model by ID':
                 model_ids_input = input("Enter model IDs to download (comma separated): ")
                 model_ids = [int(id.strip()) for id in model_ids_input.split(",")]
-
                 all_chosen_versions = []
 
                 for model_id in model_ids:
-                    # If there are multiple model_ids, download only the primary version
                     if len(model_ids) > 1:
                         model = self.fetch_model_by_id(model_id, primaryFileOnly=True)
-                        chosen_versions = [model]  # Assuming the primary model itself has the necessary details
+                        chosen_versions = [model]
                     else:
                         model = self.fetch_model_by_id(model_id)
                         chosen_versions = self.choose_model_version(model)
 
                     all_chosen_versions.append(chosen_versions)
 
-                # Determine the output path
                 default_path = os.path.expanduser("~/downloads")
-                output_path = input(f"Enter path to download the models (or press enter, default location is {{default_path}}): ")
+                output_path = input(f"Enter path to download the models (or press enter, default location is {default_path}): ")
                 if not output_path:
                     output_path = default_path
 
-                # Download the chosen versions
                 self.download_models_with_aria(','.join(map(str, model_ids)), all_chosen_versions, output_path)
 
-            elif choice == '4':
+            elif choice == 'Settings':
                 self.settings_menu()
 
-            elif choice == '5':
+            elif choice == 'Exit':
                 print("Goodbye!")
                 exit()
 
-            else:
-                print("Invalid choice. Please try again.")
-
     def settings_menu(self):
         while True:
-            print("\n--- Settings ---")
-            print("1. Change display mode (" + colored(f"{self.display_mode}", 'cyan') + ")")
-            size_options = ", ".join([f"{key} ({colored(val, 'cyan')}) - '{initial}'" for key, val, initial in zip(self.SIZE_MAPPINGS.keys(), self.SIZE_MAPPINGS.values(), ['s', 'm', 'l'])])
-            print(f"2. Adjust image size (Currently: {colored(self.image_size, 'green')}) - Options: {size_options}")
-            print("3. " + colored("Back to main menu", 'yellow'))
-            choice = input("Enter your choice: ")
+            questions = [
+                inquirer.List('choice',
+                              message="--- Settings ---",
+                              choices=[
+                                  f"Change display mode ({self.display_mode})",
+                                  f"Adjust image size (Currently: {self.image_size})",
+                                  "Back to main menu"
+                              ],
+                              carousel=True
+                              ),
+            ]
+            answers = inquirer.prompt(questions)
+            choice = answers['choice']
 
-
-            if choice == '1':
+            if 'Change display mode' in choice:
                 self.toggle_display_mode()
 
-            elif choice == "2":
-                self.set_image_size() 
+            elif 'Adjust image size' in choice:
+                self.set_image_size_inquirer()
 
-            elif choice == '3':
+            elif choice == 'Back to main menu':
                 return
 
-            else:
-                print("Invalid choice. Please try again.")
-
-
-    def set_image_size(self):
-        size_choices = {
-            's': 'small',
-            'm': 'medium',
-            'l': 'large'
-        }
-        choice = input("Enter desired image size (" + colored("s", 'cyan') + " for small, " + colored("m", 'cyan') + " for medium, " + colored("l", 'cyan') + " for large): ").lower()
-
-        if choice in size_choices:
-            self.image_size = self.SIZE_MAPPINGS[size_choices[choice]]
-            # Assuming you have a save_settings method, if not, you can comment this line out.
-            self.save_settings()  
-            print(f"Image size set to: {self.image_size}")
-        else:
-            print("Invalid choice. Please choose a valid image size.")
+    def set_image_size_inquirer(self):
+        size_choices = ['small', 'medium', 'large']
+        questions = [
+            inquirer.List('size',
+                          message="Choose the image size",
+                          choices=size_choices,
+                          carousel=True
+                          ),
+        ]
+        answers = inquirer.prompt(questions)
+        chosen_size = answers['size']  # 'small', 'medium', or 'large'
+        
+        self.image_size = self.SIZE_MAPPINGS[chosen_size]
+        self.save_settings()  # Assuming you have a save_settings method, if not, you can comment this line out.
+        print(f"Image size set to: {self.image_size}")
 
 
 
