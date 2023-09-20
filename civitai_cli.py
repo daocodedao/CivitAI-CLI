@@ -36,6 +36,7 @@ class CivitaiCLI:
         self.download_path = os.getcwd()
         # Load settings which might override the defaults
         self.load_settings()
+        self.saved_models = None 
 
         
     def toggle_display_mode(self):
@@ -251,20 +252,13 @@ class CivitaiCLI:
         ]
         return inquirer.prompt(questions)['base_model']
 
-    # Placeholder for the next action prompt. This will be filled once integrated with list_all_models method.
-    def prompt_for_next_action(self, models):
-        actions = ["Filter again", "Next page", "Download selected models", "Exit"]
-        next_action = inquirer.list_input("Choose an action:", choices=actions)
-        return next_action
-
-
-    def list_all_models(self, api_token=None):
+    def list_all_models(self, api_token=None, resume=False):
         while True:
             # Initialize params dictionary
             params = {}
 
-            # If it's the first page, prompt for filters and parameters
-            if self.current_page == 1:
+            # If it's the first page or not resuming, prompt for filters and parameters
+            if self.current_page == 1 and not resume:
                 params['limit'] = self.prompt_for_limit()
                 params.update(self.prompt_for_basic_filters())
 
@@ -281,7 +275,7 @@ class CivitaiCLI:
                 # Store current params
                 self.current_params = params
             else:
-                # If not the first page, use the stored parameters
+                # If resuming, use the stored parameters
                 params = self.current_params
 
             # Set the page parameter
@@ -291,55 +285,46 @@ class CivitaiCLI:
             headers = {}
             if api_token:
                 headers['Authorization'] = f"Bearer {api_token}"
-            models = self.fetch_all_models(**params)
 
-            # Save results to temp file (this can be removed if not needed)
-            temp_file_path = "/tmp/civitai_results.json"
-            with open(temp_file_path, 'w') as file:
-                json.dump(models, file, indent=4)
-            print(f"Results saved to: {temp_file_path}")
-
-            # Filter by base model if specified
-            if self.current_base_model:
-                models = [model for model in models if model.get('modelVersions') and model['modelVersions'][0].get('baseModel') == self.current_base_model]
+            if not resume:
+                models = self.fetch_all_models(**params)
+                self.saved_models = models
+            else:
+                models = self.saved_models
 
             # Display models
             for model in models:
                 self.display_model_details(model)
 
-            # If it's the first page, ask if the user wants to filter by base model
-            if self.current_page == 1 and inquirer.confirm("Do you want to filter by base model?", default=False):
+            # Ask user for the next action, including the base model filter
+            actions = ["Filter again", "Filter by base model", "Next page", "Download selected models", "Exit"]
+            next_action = inquirer.list_input("Choose an action:", choices=actions)
+
+            # Handle next action based on user input
+            if next_action == "Filter again":
+                self.current_page = 1
+                continue
+            elif next_action == "Filter by base model":
                 self.current_base_model = self.prompt_for_base_model()
+                models = [model for model in models if model.get('modelVersions') and model['modelVersions'][0].get('baseModel') == self.current_base_model]
+                resume = True
+                continue
+            elif next_action == "Next page":
+                self.current_page += 1
+                resume = False  # Reset the resume flag when going to the next page
+                continue
+            elif next_action == "Download selected models":
+                # Use inquirer to select models for download
+                model_choices = [{'name': f"{model['name']} (ID: {model['id']})", 'value': model['id']} for model in models]
+                selected_models_dicts = inquirer.checkbox("Select models to download:", choices=model_choices)
+                for model_dict in selected_models_dicts:
+                    model_id = model_dict['value']
+                    self.download_model(model_id)  # Use the provided download_model method
 
-                # Display models after filtering
-                filtered_models = [model for model in models if model.get('modelVersions') and model['modelVersions'][0].get('baseModel') == self.current_base_model]
-                for model in filtered_models:
-                    self.display_model_details(model)
-
-                # Ask user for the next action
-                actions = ["Filter again", "Next page", "Download selected models", "Exit"]
-                next_action = inquirer.list_input("Choose an action:", choices=actions)
-
-                # Handle next action based on user input
-                if next_action == "Filter again":
-                    self.current_page = 1
-                    continue
-                elif next_action == "Next page":
-                    self.current_page += 1
-                    continue
-                elif next_action == "Download selected models":
-                    # Use inquirer to select models for download
-                    model_choices = [{'name': f"{model['name']} (ID: {model['id']})", 'value': model['id']} for model in models]
-                    selected_models_dicts = inquirer.checkbox("Select models to download:", choices=model_choices)
-                    for model_dict in selected_models_dicts:
-                        model_id = model_dict['value']
-                        self.download_model(model_id)  # Use the provided download_model method
-
-
-                    print("Download completed. Returning to browsing...")
-                    self.current_page = 1
-                else:  # Exit
-                    break
+                print("Download completed. Returning to browsing...")
+                resume = True  # Set resume to True to continue browsing from the last state
+            else:  # Exit
+                break
 
 
 
