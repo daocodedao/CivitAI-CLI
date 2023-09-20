@@ -361,30 +361,31 @@ class CivitaiCLI:
                 for chunk in response.iter_content(chunk_size=8192):
                     file.write(chunk)
             
-            # Rename the model file to maintain consistency
-            desired_model_name = f"{model_name}.safetensors"
+            # Rename the model file using the version name to maintain uniqueness
+            desired_model_name = f"{selected_version['name']}.safetensors"
             os.rename(model_file_path, os.path.join(model_download_path, desired_model_name))
             
-            # 2. Download image (now saving it in the main directory instead of "images" subdirectory)
+                    
+            # 2. Download image
             if image_url:
                 response = requests.get(image_url, stream=True)
                 response.raise_for_status()
                 cd_header = response.headers.get('content-disposition')
-                fname = re.findall("filename=(.+)", cd_header)[0] if cd_header else f"{model_name}.jpeg"
+                fname = re.findall("filename=(.+)", cd_header)[0] if cd_header else f"{selected_version['name']}.jpeg"
                 image_file_path = os.path.join(model_download_path, fname)
                 with open(image_file_path, 'wb') as file:
                     for chunk in response.iter_content(chunk_size=8192):
                         file.write(chunk)
 
-
             # 3. Fetch and save metadata
             response = requests.get(f"https://civitai.com/api/v1/model-versions/{version_id}")
             metadata = response.json()
-            metadata_save_path = os.path.join(model_download_path, f"{model_name}.json")
+            metadata_save_path = os.path.join(model_download_path, f"{selected_version['name']}.json")
             with open(metadata_save_path, 'w') as file:
                 json.dump(metadata, file, indent=4)
-            
+                
             print(f"Downloaded {selected_version['name']} to {model_download_path}")
+
 
 
     def main_menu(self):
