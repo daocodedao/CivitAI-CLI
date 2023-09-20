@@ -378,25 +378,31 @@ class CivitaiCLI:
 
         model_download_path = self.get_model_save_path(model_details.get('type', 'default'))
         existing_files = set(os.listdir(model_download_path))
-        version_choices = [
-            {
-                'name': f"[{'x' if version['name']+'.safetensors' in existing_files else ' '}] {version['name']}",
-                'value': version['id'],
-                'disabled': version['name']+'.safetensors' in existing_files
-            } for version in model_versions
-        ]
 
-        questions = [
-            inquirer.Checkbox(
-                'selected_versions',
-                message="Select versions to download",
-                choices=version_choices,
-                carousel=True
-            ),
-        ]
-        answers = inquirer.prompt(questions)
-        selected_version_dicts = answers['selected_versions']
-        selected_version_ids = [version_dict['value'] for version_dict in selected_version_dicts]
+        # Check if only one version exists
+        if len(model_versions) == 1:
+            selected_version_ids = [model_versions[0]['id']]
+        else:
+            version_choices = [
+                {
+                    'name': f"[{'x' if version['name']+'.safetensors' in existing_files else ' '}] {version['name']}",
+                    'value': version['id'],
+                    'disabled': version['name']+'.safetensors' in existing_files
+                } for version in model_versions
+            ]
+
+            questions = [
+                inquirer.Checkbox(
+                    'selected_versions',
+                    message="Select versions to download",
+                    choices=version_choices,
+                    carousel=True
+                ),
+            ]
+            answers = inquirer.prompt(questions)
+            selected_version_dicts = answers['selected_versions']
+            selected_version_ids = [version_dict['value'] for version_dict in selected_version_dicts]
+
 
         for version_id in selected_version_ids:
             selected_version = next((version for version in model_versions if version['id'] == version_id), None)
