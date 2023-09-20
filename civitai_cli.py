@@ -21,7 +21,7 @@ class CivitaiCLI:
         'medium': '60x50',
         'large': '120x100'
     }
-
+    BASE_URL = "https://civitai.com/api/v1/models"
     def __init__(self):
         self.api_token = os.environ.get("CIVITAI_API_KEY")
         if not self.api_token:
@@ -81,7 +81,7 @@ class CivitaiCLI:
             return []
 
     def fetch_model_by_id(self, model_id, primaryFileOnly=False):
-        url = f"{BASE_URL}/{model_id}"
+        url = f"{self.BASE_URL}/{model_id}"
         params = {}
         if primaryFileOnly:
             params['primaryFileOnly'] = 'true'
@@ -90,9 +90,8 @@ class CivitaiCLI:
             return response.json()
         else:
             print("Error fetching model:", response.status_code)
-            print(response.text)  # <-- Add this to print the full error message from the server
+            print(response.text)  # Print the full error message from the server
             return {}
-
 
     def split_text_into_lines(self, text, max_width):
         words = text.split()
@@ -296,95 +295,101 @@ class CivitaiCLI:
                 model_id = model_entry['value']
                 self.download_model(model_id)
 
+
     def get_model_save_path(self, model_type):
         # Get the save path based on the model type
         relative_save_path = self.MODEL_SAVE_PATHS.get(model_type, "models/Other")
-        
         # Join the base download path with the relative save path
         absolute_save_path = os.path.join(self.download_path, relative_save_path)
-        
         # Create the directory if it doesn't exist
         os.makedirs(absolute_save_path, exist_ok=True)
-        
         return absolute_save_path
+
+    def download_file(self, url, save_path, description=None):
+        retries = 4
+        for _ in range(retries):
+            response = requests.get(url, stream=True)
+            if response.status_code == 500:
+                continue
+            response.raise_for_status()
+            total_size = int(response.headers.get('content-length', 0))
+            with tqdm(total=total_size, unit='B', unit_scale=True, desc=description) as bar:
+                with open(save_path, 'wb') as file:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        file.write(chunk)
+                        bar.update(len(chunk))
+            return
+        print("Error: The API might be down. Please try again later.")
+        exit(1)
 
     def download_model(self, model_id):
         print(f"Model ID to be downloaded: {model_id}")
-        # Fetch model details from the API
         model_details = self.fetch_model_by_id(model_id)
-        
-        # Define model_name here so it's available throughout the function
-        model_name = model_details['name']
-
-
-        # Extract model versions and prompt user to select a version
+        model_name = model_details.get('name', 'unknown')
         model_versions = model_details.get('modelVersions', [])
-        version_choices = [{'name': f"[ ] {version['name']}", 'value': version['id']} for version in model_versions]
-        
+
+        model_download_path = self.get_model_save_path(model_details.get('type', 'default'))
+        existing_files = set(os.listdir(model_download_path))
+        version_choices = [
+            {
+                'name': f"[{'x' if version['name']+'.safetensors' in existing_files else ' '}] {version['name']}",
+                'value': version['id'],
+                'disabled': version['name']+'.safetensors' in existing_files
+            } for version in model_versions
+        ]
+
         questions = [
-            inquirer.Checkbox('selected_versions',
-                              message="Select versions to download",
-                              choices=version_choices,
-                              carousel=True
-                              ),
+            inquirer.Checkbox(
+                'selected_versions',
+                message="Select versions to download",
+                choices=version_choices,
+                carousel=True
+            ),
         ]
         answers = inquirer.prompt(questions)
         selected_version_dicts = answers['selected_versions']
-
-        # Extract version IDs from the selected dictionaries
         selected_version_ids = [version_dict['value'] for version_dict in selected_version_dicts]
 
-        # Handle each of the selected version IDs
         for version_id in selected_version_ids:
             selected_version = next((version for version in model_versions if version['id'] == version_id), None)
             if not selected_version:
                 print(f"Error: Version ID {version_id} not found in the model details.")
                 continue
 
-            # Check if downloadUrl exists in the selected version
             if 'downloadUrl' not in selected_version:
                 print(f"Error: The selected version '{selected_version['name']}' does not have a download URL.")
                 continue
 
-            # Set the download URLs
+            # Download model file
             model_download_url = selected_version['downloadUrl']
-            image_url = selected_version['images'][0]['url'] if selected_version['images'] else None
-
-            # 1. Download model file
-            model_download_path = self.get_model_save_path(model_details['type'])
-            response = requests.get(model_download_url, stream=True)
-            response.raise_for_status()
-            cd_header = response.headers.get('content-disposition')
+            cd_header = requests.head(model_download_url).headers.get('content-disposition')
             fname = re.findall("filename=(.+)", cd_header)[0] if cd_header else f"{model_name}.safetensors"
             model_file_path = os.path.join(model_download_path, fname)
-            with open(model_file_path, 'wb') as file:
-                for chunk in response.iter_content(chunk_size=8192):
-                    file.write(chunk)
-            
-            # Rename the model file using the version name to maintain uniqueness
+            self.download_file(model_download_url, model_file_path, description=f"Downloading {selected_version['name']}")
+
+            # Rename the model file
             desired_model_name = f"{selected_version['name']}.safetensors"
             os.rename(model_file_path, os.path.join(model_download_path, desired_model_name))
-            
-                    
-            # 2. Download image
+
+            # Download image
+            image_url = selected_version.get('images', [{}])[0].get('url')  # Correctly fetch the image URL
             if image_url:
-                response = requests.get(image_url, stream=True)
-                response.raise_for_status()
-                cd_header = response.headers.get('content-disposition')
+                cd_header = requests.head(image_url).headers.get('content-disposition')
                 fname = re.findall("filename=(.+)", cd_header)[0] if cd_header else f"{selected_version['name']}.jpeg"
                 image_file_path = os.path.join(model_download_path, fname)
-                with open(image_file_path, 'wb') as file:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        file.write(chunk)
+                self.download_file(image_url, image_file_path, description=f"Downloading image for {selected_version['name']}")
 
-            # 3. Fetch and save metadata
-            response = requests.get(f"https://civitai.com/api/v1/model-versions/{version_id}")
+            # Fetch and save metadata with final corrected URL using a different base
+            metadata_url = f"https://civitai.com/api/v1/model-versions/{version_id}"  # Directly use the correct URL here
+            response = requests.get(metadata_url)
+            response.raise_for_status()
             metadata = response.json()
             metadata_save_path = os.path.join(model_download_path, f"{selected_version['name']}.json")
             with open(metadata_save_path, 'w') as file:
                 json.dump(metadata, file, indent=4)
-                
+
             print(f"Downloaded {selected_version['name']} to {model_download_path}")
+
 
 
 
