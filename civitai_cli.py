@@ -9,6 +9,7 @@ from html import unescape
 from tqdm import tqdm
 from termcolor import colored
 import inquirer
+import re
 
 BASE_URL = "https://civitai.com/api/v1/models"
 MAX_LINE_WIDTH = 80
@@ -296,16 +297,6 @@ class CivitaiCLI:
                 self.download_model(model_id)
 
     def get_model_save_path(self, model_type):
-        """
-        Get the save path for a given model type.
-        
-        Args:
-        - model_type (str): Type of the model.
-
-        Returns:
-        - str: Absolute path where the model should be saved.
-        """
-        
         # Get the save path based on the model type
         relative_save_path = self.MODEL_SAVE_PATHS.get(model_type, "models/Other")
         
@@ -321,6 +312,10 @@ class CivitaiCLI:
         print(f"Model ID to be downloaded: {model_id}")
         # Fetch model details from the API
         model_details = self.fetch_model_by_id(model_id)
+        
+        # Define model_name here so it's available throughout the function
+        model_name = model_details['name']
+
 
         # Extract model versions and prompt user to select a version
         model_versions = model_details.get('modelVersions', [])
@@ -357,18 +352,30 @@ class CivitaiCLI:
 
             # 1. Download model file
             model_download_path = self.get_model_save_path(model_details['type'])
-            model_file_path = subprocess.run(['wget', model_download_url, '--content-disposition', '-P', model_download_path])
-            # Rename model file to <model_name>.<file_extension>
-            model_name = model_details['name']
-            model_file_extension = os.path.splitext(model_file_path)[-1]
-            os.rename(model_file_path, os.path.join(model_download_path, f"{model_name}{model_file_extension}"))
-            
+            response = requests.get(model_download_url, stream=True)
+            response.raise_for_status()
+            cd_header = response.headers.get('content-disposition')
+            if not cd_header:
+                print(f"Error: Could not extract filename from the Content-Disposition header.")
+                continue
+            fname = re.findall("filename=(.+)", cd_header)[0]
+            model_file_path = os.path.join(model_download_path, fname)
+            with open(model_file_path, 'wb') as file:
+                for chunk in response.iter_content(chunk_size=8192):
+                    file.write(chunk)
+
             # 2. Download image
             if image_url:
                 image_save_path = os.path.join(model_download_path, "images")
-                image_file_path = subprocess.run(['wget', image_url, '--content-disposition', '-P', image_save_path])
-                # Rename image to <model_name>.jpeg
-                os.rename(image_file_path, os.path.join(image_save_path, f"{model_name}.jpeg"))
+                os.makedirs(image_save_path, exist_ok=True)
+                response = requests.get(image_url, stream=True)
+                response.raise_for_status()
+                cd_header = response.headers.get('content-disposition')
+                fname = re.findall("filename=(.+)", cd_header)[0] if cd_header else f"{model_name}.jpeg"
+                image_file_path = os.path.join(image_save_path, fname)
+                with open(image_file_path, 'wb') as file:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        file.write(chunk)
 
             # 3. Fetch and save metadata
             response = requests.get(f"https://civitai.com/api/v1/model-versions/{version_id}")
@@ -378,6 +385,7 @@ class CivitaiCLI:
                 json.dump(metadata, file, indent=4)
             
             print(f"Downloaded {selected_version['name']} to {model_download_path}")
+
 
     def main_menu(self):
         while True:
