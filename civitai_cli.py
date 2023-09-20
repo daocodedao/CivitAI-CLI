@@ -355,27 +355,27 @@ class CivitaiCLI:
             response = requests.get(model_download_url, stream=True)
             response.raise_for_status()
             cd_header = response.headers.get('content-disposition')
-            if not cd_header:
-                print(f"Error: Could not extract filename from the Content-Disposition header.")
-                continue
-            fname = re.findall("filename=(.+)", cd_header)[0]
+            fname = re.findall("filename=(.+)", cd_header)[0] if cd_header else f"{model_name}.safetensors"
             model_file_path = os.path.join(model_download_path, fname)
             with open(model_file_path, 'wb') as file:
                 for chunk in response.iter_content(chunk_size=8192):
                     file.write(chunk)
-
-            # 2. Download image
+            
+            # Rename the model file to maintain consistency
+            desired_model_name = f"{model_name}.safetensors"
+            os.rename(model_file_path, os.path.join(model_download_path, desired_model_name))
+            
+            # 2. Download image (now saving it in the main directory instead of "images" subdirectory)
             if image_url:
-                image_save_path = os.path.join(model_download_path, "images")
-                os.makedirs(image_save_path, exist_ok=True)
                 response = requests.get(image_url, stream=True)
                 response.raise_for_status()
                 cd_header = response.headers.get('content-disposition')
                 fname = re.findall("filename=(.+)", cd_header)[0] if cd_header else f"{model_name}.jpeg"
-                image_file_path = os.path.join(image_save_path, fname)
+                image_file_path = os.path.join(model_download_path, fname)
                 with open(image_file_path, 'wb') as file:
                     for chunk in response.iter_content(chunk_size=8192):
                         file.write(chunk)
+
 
             # 3. Fetch and save metadata
             response = requests.get(f"https://civitai.com/api/v1/model-versions/{version_id}")
