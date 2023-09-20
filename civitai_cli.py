@@ -62,8 +62,11 @@ class CivitaiCLI:
             "allowNoCredit": kwargs.get("allowNoCredit"),
             "allowDerivatives": kwargs.get("allowDerivatives"),
             "allowDifferentLicenses": kwargs.get("allowDifferentLicenses"),
-            "nsfw": kwargs.get("nsfw")
+            "nsfw": kwargs.get("nsfw"),
+            # Corrected the key to "baseModel"
+            "baseModel": kwargs.get("base_model")
         }
+        
         if "types" in kwargs:
             params["types"] = kwargs["types"]
 
@@ -268,6 +271,11 @@ class CivitaiCLI:
 
                 params.update(self.prompt_for_sorting())
                 params['nsfw'] = self.prompt_for_nsfw_filter()
+                
+                # Include prompt for base model filtering here
+                self.current_base_model = self.prompt_for_base_model()
+                if self.current_base_model:
+                    params['baseModel'] = self.current_base_model
 
                 # Clean up params
                 params = {k: v for k, v in params.items() if v is not None and v != ""}
@@ -282,36 +290,27 @@ class CivitaiCLI:
             params['page'] = self.current_page
 
             # Fetch models using the parameters
-            headers = {}
-            if api_token:
-                headers['Authorization'] = f"Bearer {api_token}"
+            models = self.fetch_all_models(**params)
+            self.saved_models = models
 
-            if not resume:
-                models = self.fetch_all_models(**params)
-                self.saved_models = models
-            else:
-                models = self.saved_models
+            # Post-process filtering based on baseModel if specified
+            if self.current_base_model:
+                models = [model for model in models if model.get('modelVersions') and model['modelVersions'][0].get('baseModel') == self.current_base_model]
 
             # Display models
             for model in models:
                 self.display_model_details(model)
 
-            # Ask user for the next action, including the base model filter
-            actions = ["Filter again", "Filter by base model", "Next page", "Download selected models", "Exit"]
+            # Ask user for the next action
+            actions = ["Filter again", "Next page", "Download selected models", "Exit"]
             next_action = inquirer.list_input("Choose an action:", choices=actions)
 
             # Handle next action based on user input
             if next_action == "Filter again":
                 self.current_page = 1
                 continue
-            elif next_action == "Filter by base model":
-                self.current_base_model = self.prompt_for_base_model()
-                models = [model for model in models if model.get('modelVersions') and model['modelVersions'][0].get('baseModel') == self.current_base_model]
-                resume = True
-                continue
             elif next_action == "Next page":
                 self.current_page += 1
-                resume = False  # Reset the resume flag when going to the next page
                 continue
             elif next_action == "Download selected models":
                 # Use inquirer to select models for download
@@ -325,8 +324,6 @@ class CivitaiCLI:
                 resume = True  # Set resume to True to continue browsing from the last state
             else:  # Exit
                 break
-
-
 
     def get_model_save_path(self, model_type):
         # Get the save path based on the model type
