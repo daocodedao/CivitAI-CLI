@@ -190,110 +190,157 @@ class CivitaiCLI:
         "Other": "models/Other"
     }
 
+    BASE_MODELS = ["SD 1.5", "SDXL 1.0", "SDXL 0.9"]
+
+    def prompt_for_limit(self):
+        questions = [
+            inquirer.Text('limit',
+                          message="Enter number of results per page (1-100, default 25)",
+                          validate=lambda _, x: x.isdigit() and 1 <= int(x) <= 100,
+                          default="25")
+        ]
+        return inquirer.prompt(questions)['limit']
+
+    def prompt_for_basic_filters(self):
+        questions = [
+            inquirer.Text('query', message="Filter by name (leave blank for none): "),
+            inquirer.Text('tag', message="Filter by tag (leave blank for none): "),
+            inquirer.Text('username', message="Filter by creator username (leave blank for none): ")
+        ]
+        return inquirer.prompt(questions)
+
+    def prompt_for_type_filter(self):
+        questions = [
+            inquirer.Checkbox('types',
+                              message="Select type(s) to filter by",
+                              choices=self.MODEL_TYPES)
+        ]
+        return inquirer.prompt(questions)['types']
+
+    def prompt_for_sorting(self):
+        sort_order_choices = ["Highest Rated", "Most Downloaded", "Newest"]
+        period_choices = ["AllTime", "Year", "Month", "Week", "Day"]
+
+        questions = [
+            inquirer.List('sort',
+                          message="Choose a sort order",
+                          choices=sort_order_choices,
+                          default=sort_order_choices[0]),
+            inquirer.List('period',
+                          message="Choose a time frame for sorting",
+                          choices=period_choices,
+                          default=period_choices[0])
+        ]
+        return inquirer.prompt(questions)
+
+    def prompt_for_nsfw_filter(self):
+        nsfw_choices = ["all", "nsfw", "sfw"]
+        questions = [
+            inquirer.List('nsfw',
+                          message="Filter by NSFW?",
+                          choices=nsfw_choices,
+                          default="sfw")
+        ]
+        return inquirer.prompt(questions)['nsfw']
+
+    def prompt_for_base_model(self):
+        questions = [
+            inquirer.List('base_model',
+                          message="Select a base model to filter by",
+                          choices=self.BASE_MODELS)
+        ]
+        return inquirer.prompt(questions)['base_model']
+
+    # Placeholder for the next action prompt. This will be filled once integrated with list_all_models method.
+    def prompt_for_next_action(self, models):
+        actions = ["Filter again", "Next page", "Download selected models", "Exit"]
+        next_action = inquirer.list_input("Choose an action:", choices=actions)
+        return next_action
+
+
     def list_all_models(self, api_token=None):
-        params = {}
-        if self.current_page == 1:
-            params['limit'] = int(input("Enter number of results per page (1-100, default 25): ") or 25)
-            params['query'] = input("Filter by name (leave blank for none): ")
-            params['tag'] = input("Filter by tag (leave blank for none): ")
-            params['username'] = input("Filter by creator username (leave blank for none): ")
+        while True:
+            # Initialize params dictionary
+            params = {}
 
-            filter_by_type = input("Filter by type? (y/n) default is n: ").lower()
-            if filter_by_type == 'y' or filter_by_type == 'yes':
-                print("Select type(s) by entering the corresponding numbers (separate multiple choices with a comma):")
-                for idx, model_type in enumerate(self.MODEL_TYPES, 1):
-                    print(f"{idx}. {model_type}")
-                selected_indices = input().split(",")
-                params['types'] = [self.MODEL_TYPES[int(idx)-1] for idx in selected_indices]
+            # If it's the first page, prompt for filters and parameters
+            if self.current_page == 1:
+                params['limit'] = self.prompt_for_limit()
+                params.update(self.prompt_for_basic_filters())
 
-            params['sort'] = input("Sort order (Highest Rated, Most Downloaded, Newest, leave blank for default): ")
-            params['period'] = input("Time frame for sorting (AllTime, Year, Month, Week, Day, leave blank for default): ")
-            rating_input = input("Filter by rating (leave blank for any): ")
-            params['rating'] = float(rating_input) if rating_input else None
-            nsfw_input = input("Filter by NSFW? (all/nsfw/sfw, default is sfw): ").lower() or 'sfw'
-            if nsfw_input == 'nsfw':
-                params['nsfw'] = True
-            elif nsfw_input == 'sfw' or not nsfw_input:
-                params['nsfw'] = False
+                # Ask if user wants to filter by type
+                if inquirer.confirm("Filter by type?", default=False):
+                    params['types'] = self.prompt_for_type_filter()
 
-            params = {k: v for k, v in params.items() if v is not None}
-            
-            self.current_params = params
+                params.update(self.prompt_for_sorting())
+                params['nsfw'] = self.prompt_for_nsfw_filter()
 
-        else:
-            params = self.current_params
+                # Clean up params
+                params = {k: v for k, v in params.items() if v is not None and v != ""}
 
-        headers = {}
-        if api_token:
-            headers['Authorization'] = f"Bearer {api_token}"
+                # Store current params
+                self.current_params = params
+            else:
+                # If not the first page, use the stored parameters
+                params = self.current_params
 
-        params['page'] = self.current_page
-        models = self.fetch_all_models(**params)
-        
-        temp_file_path = "/tmp/civitai_results.json"
-        with open(temp_file_path, 'w') as file:
-            json.dump(models, file, indent=4)
+            # Set the page parameter
+            params['page'] = self.current_page
 
-        print(f"Results saved to: {temp_file_path}")
+            # Fetch models using the parameters
+            headers = {}
+            if api_token:
+                headers['Authorization'] = f"Bearer {api_token}"
+            models = self.fetch_all_models(**params)
 
-        if self.current_base_model:
-            models = [model for model in models if model.get('modelVersions') and model['modelVersions'][0].get('baseModel') == self.current_base_model]
+            # Save results to temp file (this can be removed if not needed)
+            temp_file_path = "/tmp/civitai_results.json"
+            with open(temp_file_path, 'w') as file:
+                json.dump(models, file, indent=4)
+            print(f"Results saved to: {temp_file_path}")
 
-        for model in models:
-            self.display_model_details(model)
+            # Filter by base model if specified
+            if self.current_base_model:
+                models = [model for model in models if model.get('modelVersions') and model['modelVersions'][0].get('baseModel') == self.current_base_model]
 
-        if self.current_page == 1:
-            filter_by_base_model = input("Do you want to filter by base model? (y/n): ").lower()
-            if filter_by_base_model == 'y':
-                print("Select a base model:")
-                print("1. SD 1.5")
-                print("2. SDXL 1.0")
-                print("3. SDXL 0.9")
-                choice = input("Enter your choice: ")
+            # Display models
+            for model in models:
+                self.display_model_details(model)
 
-                base_model_map = {
-                    "1": "SD 1.5",
-                    "2": "SDXL 1.0",
-                    "3": "SDXL 0.9"
-                }
+            # If it's the first page, ask if the user wants to filter by base model
+            if self.current_page == 1 and inquirer.confirm("Do you want to filter by base model?", default=False):
+                self.current_base_model = self.prompt_for_base_model()
 
-                base_model_selected = base_model_map.get(choice)
-                if base_model_selected:
-                    self.current_base_model = base_model_selected
-                    filtered_models = [model for model in models if model.get('modelVersions') and model['modelVersions'][0].get('baseModel') == base_model_selected]
-                    if filtered_models:
-                        for model in filtered_models:
-                            self.display_model_details(model)
-                    else:
-                        print(f"No models found for base model: {base_model_selected}")
-                else:
-                    print("Invalid choice.")
+                # Display models after filtering
+                filtered_models = [model for model in models if model.get('modelVersions') and model['modelVersions'][0].get('baseModel') == self.current_base_model]
+                for model in filtered_models:
+                    self.display_model_details(model)
 
-        action_prompt = f"Do you want to filter again or look on the next page? (y/n/{self.current_page + 1}/d): "
-        action = input(action_prompt).lower()
+                # Ask user for the next action
+                actions = ["Filter again", "Next page", "Download selected models", "Exit"]
+                next_action = inquirer.list_input("Choose an action:", choices=actions)
 
-        if action == 'n':
-            self.current_page = 1
-            return
-        elif action == str(self.current_page + 1):
-            self.current_page += 1
-            self.list_all_models(api_token)
-        elif action == 'd':
-            model_choices = [{'name': f"{model['name']} (ID: {model['id']})", 'value': model['id']} for model in models]
-            
-            questions = [
-                inquirer.Checkbox('selected_models',
-                                  message="Select models to download",
-                                  choices=model_choices,
-                                  carousel=True
-                                  ),
-            ]
-            answers = inquirer.prompt(questions)
-            selected_model_ids = answers['selected_models']
-            
-            for model_entry in selected_model_ids:
-                model_id = model_entry['value']
-                self.download_model(model_id)
+                # Handle next action based on user input
+                if next_action == "Filter again":
+                    self.current_page = 1
+                    continue
+                elif next_action == "Next page":
+                    self.current_page += 1
+                    continue
+                elif next_action == "Download selected models":
+                    # Use inquirer to select models for download
+                    model_choices = [{'name': f"{model['name']} (ID: {model['id']})", 'value': model['id']} for model in models]
+                    selected_models_dicts = inquirer.checkbox("Select models to download:", choices=model_choices)
+                    for model_dict in selected_models_dicts:
+                        model_id = model_dict['value']
+                        self.download_model(model_id)  # Use the provided download_model method
+
+
+                    print("Download completed. Returning to browsing...")
+                    self.current_page = 1
+                else:  # Exit
+                    break
+
 
 
     def get_model_save_path(self, model_type):
@@ -314,6 +361,7 @@ class CivitaiCLI:
             response.raise_for_status()
             total_size = int(response.headers.get('content-length', 0))
             with tqdm(total=total_size, unit='B', unit_scale=True, desc=description) as bar:
+                os.makedirs(os.path.dirname(save_path), exist_ok=True)
                 with open(save_path, 'wb') as file:
                     for chunk in response.iter_content(chunk_size=8192):
                         file.write(chunk)
@@ -356,39 +404,49 @@ class CivitaiCLI:
                 print(f"Error: Version ID {version_id} not found in the model details.")
                 continue
 
-            if 'downloadUrl' not in selected_version:
-                print(f"Error: The selected version '{selected_version['name']}' does not have a download URL.")
-                continue
+            # Determine the base name for the saved files
+            if len(model_versions) == 1 or selected_version['name'] == "v1.0":
+                saved_file_base_name = model_name
+            else:
+                saved_file_base_name = selected_version['name']
 
             # Download model file
             model_download_url = selected_version['downloadUrl']
             cd_header = requests.head(model_download_url).headers.get('content-disposition')
-            fname = re.findall("filename=(.+)", cd_header)[0] if cd_header else f"{model_name}.safetensors"
+            
+            # Extract file extension from header
+            if cd_header:
+                fname_from_header = re.findall("filename=(.+)", cd_header)[0]
+                file_extension = os.path.splitext(fname_from_header)[1]
+            else:
+                file_extension = ".safetensors"
+            
+            # Combine base name with extension
+            fname = f"{saved_file_base_name}{file_extension}"
+            
             model_file_path = os.path.join(model_download_path, fname)
-            self.download_file(model_download_url, model_file_path, description=f"Downloading {selected_version['name']}")
-
-            # Rename the model file
-            desired_model_name = f"{selected_version['name']}.safetensors"
-            os.rename(model_file_path, os.path.join(model_download_path, desired_model_name))
+            self.download_file(model_download_url, model_file_path, description=f"Downloading {saved_file_base_name}")
 
             # Download image
             image_url = selected_version.get('images', [{}])[0].get('url')  # Correctly fetch the image URL
             if image_url:
                 cd_header = requests.head(image_url).headers.get('content-disposition')
-                fname = re.findall("filename=(.+)", cd_header)[0] if cd_header else f"{selected_version['name']}.jpeg"
-                image_file_path = os.path.join(model_download_path, fname)
-                self.download_file(image_url, image_file_path, description=f"Downloading image for {selected_version['name']}")
+                image_extension = os.path.splitext(re.findall("filename=(.+)", cd_header)[0])[1] if cd_header else ".jpeg"
+                image_file_name = f"{saved_file_base_name}{image_extension}"
+                image_file_path = os.path.join(model_download_path, image_file_name)
+                self.download_file(image_url, image_file_path, description=f"Downloading image for {saved_file_base_name}")
 
             # Fetch and save metadata with final corrected URL using a different base
             metadata_url = f"https://civitai.com/api/v1/model-versions/{version_id}"  # Directly use the correct URL here
             response = requests.get(metadata_url)
             response.raise_for_status()
             metadata = response.json()
-            metadata_save_path = os.path.join(model_download_path, f"{selected_version['name']}.json")
+            metadata_file_name = f"{saved_file_base_name}.json"
+            metadata_save_path = os.path.join(model_download_path, metadata_file_name)
             with open(metadata_save_path, 'w') as file:
                 json.dump(metadata, file, indent=4)
 
-            print(f"Downloaded {selected_version['name']} to {model_download_path}")
+            print(f"Downloaded {saved_file_base_name} to {model_download_path}")
 
 
 
