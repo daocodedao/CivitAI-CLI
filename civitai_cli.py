@@ -10,6 +10,8 @@ from tqdm import tqdm
 from termcolor import colored
 import inquirer
 import re
+import signal
+import sys
 
 BASE_URL = "https://civitai.com/api/v1/models"
 MAX_LINE_WIDTH = 80
@@ -38,10 +40,10 @@ class CivitaiCLI:
         self.load_settings()
         self.saved_models = None 
 
-        
     def toggle_display_mode(self):
         self.display_mode = "images" if self.display_mode == "text" else "text"
         print(f"Switched display mode to {self.display_mode}.")
+        self.save_settings()  
 
     def construct_url(self, params):
         return f"{BASE_URL}?{'&'.join([f'{k}={v}' for k, v in params.items()])}"
@@ -194,7 +196,7 @@ class CivitaiCLI:
         "Other": "models/Other"
     }
 
-    BASE_MODELS = ["SD 1.5", "SDXL 1.0", "SDXL 0.9"]
+    BASE_MODELS = ["None", "SD 1.4", "SD 1.5", "SD 2.0", "SD 2.0 768", "SD 2.1", "SD 2.1 768", "SDXL 0.9", "SDXL 1.0", "Other"]
 
     def prompt_for_limit(self):
         questions = [
@@ -250,18 +252,29 @@ class CivitaiCLI:
     def prompt_for_base_model(self):
         questions = [
             inquirer.List('base_model',
-                          message="Select a base model to filter by",
+                          message="Select a base model to filter by (or None to skip)",
                           choices=self.BASE_MODELS)
         ]
-        return inquirer.prompt(questions)['base_model']
+        base_model = inquirer.prompt(questions)['base_model']
+        return None if base_model == "None" else base_model
+
+    def print_orange_line(self):
+        # ANSI escape code for bright orange (may appear as yellow in some terminals)
+        ORANGE = '\033[93m'
+        # ANSI escape code to reset to default
+        RESET = '\033[0m'
+        
+        print(ORANGE + '-' * 250 + RESET)
+
 
     def list_all_models(self, api_token=None, resume=False):
+        fetching_page = False
         while True:
             # Initialize params dictionary
             params = {}
 
             # If it's the first page or not resuming, prompt for filters and parameters
-            if self.current_page == 1 and not resume:
+            if self.current_page == 1 and not resume and not fetching_page:
                 params['limit'] = self.prompt_for_limit()
                 params.update(self.prompt_for_basic_filters())
 
@@ -297,12 +310,18 @@ class CivitaiCLI:
             if self.current_base_model:
                 models = [model for model in models if model.get('modelVersions') and model['modelVersions'][0].get('baseModel') == self.current_base_model]
 
-            # Display models
+            # Inform the user about the current page
+            self.print_orange_line()
+            print(f"Displaying page {self.current_page} of models:")
             for model in models:
+
                 self.display_model_details(model)
+            self.print_orange_line()
+            # Show current page right above the prompt
+            print(f"\nCurrently on page {self.current_page}.\n")
 
             # Ask user for the next action
-            actions = ["Filter again", "Next page", "Download selected models", "Exit"]
+            actions = ["Next page", "Previous page", "Jump to page", "Download selected models", "Filter again", "Exit"]
             next_action = inquirer.list_input("Choose an action:", choices=actions)
 
             # Handle next action based on user input
@@ -312,6 +331,20 @@ class CivitaiCLI:
             elif next_action == "Next page":
                 self.current_page += 1
                 continue
+            elif next_action == "Previous page":
+                if self.current_page > 1:
+                    self.current_page -= 1
+                else:
+                    print("You're already on the first page.")
+                    resume = True
+                continue
+
+            elif next_action == "Jump to page":
+                desired_page = int(input("Enter the page number to jump to: "))
+                self.current_page = desired_page
+                fetching_page = True  # Set flag
+                continue
+
             elif next_action == "Download selected models":
                 # Use inquirer to select models for download
                 model_choices = [{'name': f"{model['name']} (ID: {model['id']})", 'value': model['id']} for model in models]
@@ -407,7 +440,7 @@ class CivitaiCLI:
                 fname_from_header = re.findall("filename=(.+)", cd_header)[0]
                 file_extension = os.path.splitext(fname_from_header)[1]
             else:
-                file_extension = ".safetensors"
+                file_extension = ".WRONG"
             
             # Combine base name with extension
             fname = f"{saved_file_base_name}{file_extension}"
@@ -435,9 +468,6 @@ class CivitaiCLI:
                 json.dump(metadata, file, indent=4)
 
             print(f"Downloaded {saved_file_base_name} to {model_download_path}")
-
-
-
 
     def main_menu(self):
         while True:
@@ -468,7 +498,6 @@ class CivitaiCLI:
             elif choice == 'Exit':
                 print("Goodbye!")
                 exit()
-
 
     def settings_menu(self):
         while True:
@@ -541,12 +570,24 @@ class CivitaiCLI:
             'image_size': self.image_size,
             'download_path': self.download_path
         }
-        with open(SETTINGS_FILE, 'w') as file:
-            json.dump(settings, file)
+        try:
+            with open(SETTINGS_FILE, 'w') as file:
+                json.dump(settings, file)
+        except Exception as e:
+            print(f"Error writing to {SETTINGS_FILE}: {e}")
+
+    def graceful_shutdown(self, signal_received, frame):
+        # Here, you can add any cleanup logic if necessary
+        print("\nCTRL+C detected. Exiting gracefully...")
+        sys.exit(0)
 
     def run(self):
         self.main_menu()
 
 if __name__ == '__main__':
     cli = CivitaiCLI()
+    
+    # Set up signal handling for graceful shutdown
+    signal.signal(signal.SIGINT, cli.graceful_shutdown)
+
     cli.run()
