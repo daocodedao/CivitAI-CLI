@@ -64,7 +64,7 @@ class CivitaiCLI:
             "allowNoCredit": kwargs.get("allowNoCredit"),
             "allowDerivatives": kwargs.get("allowDerivatives"),
             "allowDifferentLicenses": kwargs.get("allowDifferentLicenses"),
-            "nsfw": kwargs.get("nsfw"),
+            "nsfw": str(kwargs.get("nsfw")).lower() if kwargs.get("nsfw") is not None else None,
             # Corrected the key to "baseModel"
             "baseModel": kwargs.get("base_model")
         }
@@ -245,9 +245,16 @@ class CivitaiCLI:
             inquirer.List('nsfw',
                           message="Filter by NSFW?",
                           choices=nsfw_choices,
-                          default="sfw")
+                          default=self.default_nsfw_filter)
         ]
-        return inquirer.prompt(questions)['nsfw']
+        user_choice = inquirer.prompt(questions)['nsfw']
+        if user_choice == "all":
+            return True
+        elif user_choice == "sfw":
+            return False
+        elif user_choice == "nsfw":
+            return "only_nsfw" 
+
 
     def prompt_for_base_model(self):
         questions = [
@@ -305,6 +312,10 @@ class CivitaiCLI:
             models = self.fetch_all_models(**params)
             self.saved_models = models
 
+            # If the user chose 'nsfw', filter the models accordingly
+            if params.get('nsfw') == 'only_nsfw':
+                models = [model for model in models if model.get('nsfw')]
+
             # Post-process filtering based on baseModel if specified
             if self.current_base_model:
                 models = [model for model in models if model.get('modelVersions') and model['modelVersions'][0].get('baseModel') == self.current_base_model]
@@ -345,12 +356,18 @@ class CivitaiCLI:
                 continue
 
             elif next_action == "Download selected models":
+                # Create a mapping of model names to IDs
+                model_name_to_id = {model['name']: model['id'] for model in models}
                 # Use inquirer to select models for download
-                model_choices = [{'name': f"{model['name']} (ID: {model['id']})", 'value': model['id']} for model in models]
-                selected_models_dicts = inquirer.checkbox("Select models to download:", choices=model_choices)
-                for model_dict in selected_models_dicts:
-                    model_id = model_dict['value']
-                    self.download_model(model_id)  # Use the provided download_model method
+                model_choices = [model['name'] for model in models]
+                selected_model_names = inquirer.checkbox("Select models to download:", choices=model_choices)
+
+                # Convert selected names back to IDs
+                selected_model_ids = [model_name_to_id[name] for name in selected_model_names]
+
+                # Download each selected model
+                for model_id in selected_model_ids:
+                    self.download_model(model_id)
 
                 print("Download completed. Returning to browsing...")
                 resume = True  # Set resume to True to continue browsing from the last state
@@ -362,7 +379,6 @@ class CivitaiCLI:
         absolute_save_path = os.path.join(self.download_path, relative_save_path)
         os.makedirs(absolute_save_path, exist_ok=True)
         return absolute_save_path
-
 
     def download_file(self, url, save_path):
         try:
@@ -416,35 +432,86 @@ class CivitaiCLI:
         except requests.RequestException as e:
             print(f"Error downloading image {url}: {e}")
 
-    def save_model_info(self, model_details, save_path, base_name):
-        try:
-            info_file_path = os.path.join(save_path, f"{base_name}.json")
-            
-            with open(info_file_path, "w") as f:
-                json.dump(model_details, f, indent=4)
-                
-            print(f"Saved model information to {info_file_path}")
-        except Exception as e:
-            print(f"An error occurred while saving model information: {e}")
-
     def prompt_for_versions(self, model_versions, existing_files):
-        version_choices = [
-            {
-                'name': version['name'],
-                'value': version['id'],
-                'disabled': f"{version['name']}.safetensors" in existing_files
-            } for version in model_versions
-        ]
-        questions = [
-            inquirer.Checkbox(
-                'selected_versions',
-                message="Select versions to download",
-                choices=version_choices,
-                carousel=True
-            ),
-        ]
-        answers = inquirer.prompt(questions)
-        return [version['value'] for version in answers['selected_versions']]
+        # Create a mapping of version names to IDs
+        version_name_to_id = {version['name']: version['id'] for version in model_versions}
+
+        # Use Inquirer to select versions for download
+        version_choices = [version['name'] for version in model_versions]
+        selected_version_names = inquirer.checkbox("Select versions to download:", choices=version_choices)
+
+        # Convert selected names back to IDs
+        selected_version_ids = [version_name_to_id[name] for name in selected_version_names]
+
+        return selected_version_ids
+
+    def map_sd_version(self, sd_version):
+        """Map SD versions to their simplified forms"""
+        mapping = {
+            "SD 1.4": "SD1",
+            "SD 1.5": "SD1",
+            "SD 2.0": "SD2",
+            "SD 2.0 768": "SD2",
+            "SD 2.1": "SD2",
+            "SD 2.1 768": "SD2",
+            "SDXL 0.9": "SDXL",
+            "SDXL 1.0": "SDXL",
+            "Other": "Unknown"
+        }
+        return mapping.get(sd_version, "Unknown")
+        
+    def clean_html(self, raw_html):
+        """Remove HTML tags from a string"""
+        cleanr = re.compile('<.*?>')
+        cleantext = re.sub(cleanr, '', raw_html)
+        return unescape(cleantext)
+
+    def query_model_info(self, url):
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            print(f"An error occurred while fetching model information: {e}")
+            return None
+
+    def save_model_info(self, model_id, version_id, save_path, base_name):
+        version_url = f"https://civitai.com/api/v1/model-versions/{version_id}"
+        model_url = f"https://civitai.com/api/v1/models/{model_id}"
+
+        # Query the version-specific and the model-specific information
+        version_info = self.query_model_info(version_url)
+        model_info = self.query_model_info(model_url)
+        
+        if version_info is not None:
+            try:
+                # Save the .civitai.info file
+                info_file_path = os.path.join(save_path, f"{base_name}.civitai.info")
+                with open(info_file_path, "w") as f:
+                    json.dump(version_info, f, indent=4)
+                print(f"Saved model information to {info_file_path}")
+
+                # Create and save the .json file
+                formatted_json = {
+                    "description": self.clean_html(model_info.get('description', '')),
+                    "notes": version_info.get('description', '') or "",
+                    "sd version": self.map_sd_version(version_info.get('baseModel', '')),
+                    "activation text": ', '.join(version_info.get('trainedWords', [])),
+                    "preferred weight": 0,
+                    "extensions": {
+                        "sd_civitai_helper": {
+                            "version": "1.7.2"
+                        }
+                    }
+                }
+                        
+                json_file_path = os.path.join(save_path, f"{base_name}.json")
+                with open(json_file_path, "w") as f:
+                    json.dump(formatted_json, f, indent=4)
+                print(f"Saved formatted model information to {json_file_path}")
+
+            except Exception as e:
+                print(f"An error occurred while saving model information: {e}")
 
     def download_model(self, model_id):
         model_details = self.fetch_model_by_id(model_id)
@@ -463,15 +530,17 @@ class CivitaiCLI:
 
             model_download_url = version_detail['downloadUrl']
             original_file_name = self.download_file(model_download_url, model_download_path)
-            
+                    
             if original_file_name:
                 base_name, _ = os.path.splitext(original_file_name)
 
                 # Download images and save model information
                 image_urls = [image['url'] for image in version_detail.get('images', [])]
                 self.download_images(image_urls, model_download_path, base_name)
-                self.save_model_info(model_details, model_download_path, base_name)
 
+                # Note the change here: Pass the selected version ID
+                self.save_model_info(model_id, version_id, model_download_path, base_name)
+                        
                 print(f"✔ Successfully downloaded to {original_file_name} in {model_download_path}")
             else:
                 print("❌ Download failed.")
@@ -516,6 +585,7 @@ class CivitaiCLI:
                                   f"Change display mode ({self.display_mode})",
                                   f"Adjust image size (Currently: {self.image_size})",
                                   f"Set default download path (Currently: {self.download_path})",
+                                  f"Set default NSFW filter (Currently: {self.default_nsfw_filter})",
                                   "Back to main menu"
                               ],
                               carousel=True
@@ -530,8 +600,24 @@ class CivitaiCLI:
                 self.set_image_size_inquirer()
             elif 'Set default download path' in choice:
                 self.set_default_download_path()
+            elif 'Set default NSFW filter' in choice:
+                self.set_default_nsfw_filter()  # New method for NSFW
             elif choice == 'Back to main menu':
                 return
+
+    def set_default_nsfw_filter(self):
+        nsfw_choices = ["all", "nsfw", "sfw"]
+        questions = [
+            inquirer.List('default_nsfw',
+                          message="Choose the default NSFW filter setting",
+                          choices=nsfw_choices,
+                          carousel=True
+                          ),
+        ]
+        answers = inquirer.prompt(questions)
+        self.default_nsfw_filter = answers['default_nsfw']
+        self.save_settings()
+        print(f"Default NSFW filter set to: {self.default_nsfw_filter}")
 
     def set_image_size_inquirer(self):
         size_choices = ['small', 'medium', 'large']
@@ -566,7 +652,9 @@ class CivitaiCLI:
                     settings = json.load(file)
                     self.display_mode = settings.get('display_mode', 'text')
                     self.image_size = settings.get('image_size', self.SIZE_MAPPINGS['medium'])
-                    self.download_path = settings.get('download_path', os.getcwd())  # default to current directory
+                    self.download_path = settings.get('download_path', os.getcwd()) 
+                    self.default_nsfw_filter = settings.get('default_nsfw_filter', 'sfw')  
+
             except json.JSONDecodeError:
                 print(f"Error decoding {SETTINGS_FILE}. Please ensure it's in valid JSON format.")
             except Exception as e:
@@ -576,7 +664,8 @@ class CivitaiCLI:
         settings = {
             'display_mode': self.display_mode,
             'image_size': self.image_size,
-            'download_path': self.download_path
+            'download_path': self.download_path,
+            'default_nsfw_filter': self.default_nsfw_filter,
         }
         try:
             with open(SETTINGS_FILE, 'w') as file:
