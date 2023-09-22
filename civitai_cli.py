@@ -259,7 +259,6 @@ class CivitaiCLI:
         elif user_choice == "nsfw":
             return "only_nsfw" 
 
-
     def prompt_for_base_model(self):
         questions = [
             inquirer.List('base_model',
@@ -530,7 +529,10 @@ class CivitaiCLI:
         model_download_path = self.get_model_save_path(model_details.get('type', 'default'))
         existing_files = set(os.listdir(model_download_path))
 
-        selected_version_ids = self.prompt_for_versions(model_versions, existing_files) if len(model_versions) > 1 else [model_versions[0]['id']]
+        if self.always_primary_version:
+            selected_version_ids = [model_versions[0]['id']] if model_versions else []
+        else:
+            selected_version_ids = self.prompt_for_versions(model_versions, existing_files) if len(model_versions) > 1 else [model_versions[0]['id']]
 
         for version_id in selected_version_ids:
             version_detail = next((v for v in model_versions if v['id'] == version_id), None)
@@ -702,7 +704,7 @@ class CivitaiCLI:
                 json.dump(settings, file)
         except Exception as e:
             print(f"Error writing to {SETTINGS_FILE}: {e}")
-            
+
     def graceful_shutdown(self, signal_received, frame):
         # Here, you can add any cleanup logic if necessary
         print("\nCTRL+C detected. Exiting gracefully...")
