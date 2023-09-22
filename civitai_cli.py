@@ -363,23 +363,39 @@ class CivitaiCLI:
         os.makedirs(absolute_save_path, exist_ok=True)
         return absolute_save_path
 
-    def download_file(self, url, save_path):
-        cmd = ["wget", url, "--content-disposition", "-P", save_path]
-        try:
-            subprocess.check_call(cmd)
 
-            # Fetch only headers initially
+    def download_file(self, url, save_path):
+        try:
             response = requests.get(url, stream=True)
+            response.raise_for_status()
+
             cd_header = response.headers.get('content-disposition')
-            
             if cd_header:
-                extracted_name = re.findall("filename=(.+)", cd_header)[0]
-                return extracted_name.strip("\"")  # Remove any quotes around the filename
+                extracted_name = re.findall("filename=(.+)", cd_header)[0].strip("\"")
+                file_size = int(response.headers.get('content-length', 0))
+
+                save_file_path = os.path.join(save_path, extracted_name)
+                
+                # Initialize tqdm object
+                pbar = tqdm(
+                    total=file_size, unit='B',
+                    unit_scale=True, unit_divisor=1024,
+                    desc=f"Downloading {extracted_name}"
+                )
+                
+                with open(save_file_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+                        pbar.update(len(chunk))
+                
+                pbar.close()
+
+                return extracted_name
             else:
-                print("Content-Dispostion Header missing or empty.")
+                print("Content-Disposition Header missing or empty.")
                 return None
-        except subprocess.CalledProcessError:
-            print(f"Error downloading {url}")
+        except Exception as e:
+            print(f"Error downloading {url}: {e}")
             return None
 
     def download_images(self, image_urls, save_path, base_name):
@@ -447,18 +463,19 @@ class CivitaiCLI:
 
             model_download_url = version_detail['downloadUrl']
             original_file_name = self.download_file(model_download_url, model_download_path)
+            
             if original_file_name:
                 base_name, _ = os.path.splitext(original_file_name)
 
                 # Download images and save model information
                 image_urls = [image['url'] for image in version_detail.get('images', [])]
-                self.download_images(image_urls, model_download_path, base_name)  # Passing base_name
-                self.save_model_info(model_details, model_download_path, base_name)  # Passing base_name
+                self.download_images(image_urls, model_download_path, base_name)
+                self.save_model_info(model_details, model_download_path, base_name)
 
-                print(f"Downloaded to {original_file_name} in {model_download_path}")
-
+                print(f"✔ Successfully downloaded to {original_file_name} in {model_download_path}")
             else:
-                print("Download failed.")
+                print("❌ Download failed.")
+
 
     def main_menu(self):
         while True:
