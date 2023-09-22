@@ -14,7 +14,7 @@ import signal
 import sys
 from PIL import Image
 import io
-
+import time
 
 BASE_URL = "https://civitai.com/api/v1/models"
 MAX_LINE_WIDTH = 80
@@ -37,12 +37,11 @@ class CivitaiCLI:
         self.current_page = 1
         self.display_mode = "text"
         self.image_size = self.SIZE_MAPPINGS['medium']
-        # Initialize download path to current working directory by default
         self.download_path = os.getcwd()
-        # Load settings which might override the defaults
+        self.always_primary_version = True
         self.load_settings()
         self.saved_models = None 
-        self.always_primary_version = True
+
 
     def toggle_display_mode(self):
         self.display_mode = "images" if self.display_mode == "text" else "text"
@@ -383,39 +382,61 @@ class CivitaiCLI:
         os.makedirs(absolute_save_path, exist_ok=True)
         return absolute_save_path
 
-    def download_file(self, url, save_path):
-        try:
-            response = requests.get(url, stream=True)
-            response.raise_for_status()
+    def download_file(self, url, save_path, max_retries=3, delay_between_retries=2):
+        for attempt in range(max_retries):
+            try:
+                response = requests.get(url, stream=True)
+                response.raise_for_status()
 
-            cd_header = response.headers.get('content-disposition')
-            if cd_header:
-                extracted_name = re.findall("filename=(.+)", cd_header)[0].strip("\"")
-                file_size = int(response.headers.get('content-length', 0))
+                cd_header = response.headers.get('content-disposition')
+                if cd_header:
+                    extracted_name = re.findall("filename=(.+)", cd_header)[0].strip("\"")
+                    file_size = int(response.headers.get('content-length', 0))
 
-                save_file_path = os.path.join(save_path, extracted_name)
-                
-                # Initialize tqdm object
-                pbar = tqdm(
-                    total=file_size, unit='B',
-                    unit_scale=True, unit_divisor=1024,
-                    desc=f"Downloading {extracted_name}"
-                )
-                
-                with open(save_file_path, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        f.write(chunk)
-                        pbar.update(len(chunk))
-                
-                pbar.close()
+                    save_file_path = os.path.join(save_path, extracted_name)
 
-                return extracted_name
-            else:
-                print("Content-Disposition Header missing or empty.")
+                    # Check if the file already exists
+                    if os.path.exists(save_file_path):
+                        choices = ['Overwrite', 'Skip']
+                        action = inquirer.list_input(f"File {extracted_name} already exists. What would you like to do?", choices=choices)
+                        
+                        if action == 'Skip':
+                            print("Skipping download.")
+                            return None
+                    
+                    # Initialize tqdm object
+                    pbar = tqdm(
+                        total=file_size, unit='B',
+                        unit_scale=True, unit_divisor=1024,
+                        desc=f"Downloading {extracted_name}"
+                    )
+                    
+                    with open(save_file_path, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                            pbar.update(len(chunk))
+                    
+                    pbar.close()
+
+                    return extracted_name
+                else:
+                    print("Content-Disposition Header missing or empty.")
+                    return None
+            except requests.HTTPError as e:
+                status_code = e.response.status_code
+                if status_code == 404:
+                    print(f"File not found at {url}.")
+                    return None
+                elif 400 <= status_code < 600:
+                    print(f"Encountered an error ({status_code}). Retrying... ({attempt + 1}/{max_retries})")
+                    time.sleep(delay_between_retries)
+                    continue
+            except Exception as e:
+                print(f"Error downloading {url}: {e}")
                 return None
-        except Exception as e:
-            print(f"Error downloading {url}: {e}")
-            return None
+
+        print("Maximum retries reached. Could not download the file.")
+        return None
 
     def download_images(self, image_urls, save_path, base_name):
         if not image_urls:
@@ -579,7 +600,8 @@ class CivitaiCLI:
                 self.display_model_details(model)
 
             elif choice == 'Download model by ID':
-                pass
+                model_id = int(input("Enter model ID: "))
+                self.download_model(model_id)
 
             elif choice == 'Settings':
                 self.settings_menu()
