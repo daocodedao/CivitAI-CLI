@@ -12,6 +12,9 @@ import inquirer
 import re
 import signal
 import sys
+from PIL import Image
+import io
+
 
 BASE_URL = "https://civitai.com/api/v1/models"
 MAX_LINE_WIDTH = 80
@@ -39,6 +42,7 @@ class CivitaiCLI:
         # Load settings which might override the defaults
         self.load_settings()
         self.saved_models = None 
+        self.always_primary_version = True
 
     def toggle_display_mode(self):
         self.display_mode = "images" if self.display_mode == "text" else "text"
@@ -196,7 +200,7 @@ class CivitaiCLI:
         "Other": "models/Other"
     }
 
-    BASE_MODELS = ["None", "SD 1.4", "SD 1.5", "SD 2.0", "SD 2.0 768", "SD 2.1", "SD 2.1 768", "SDXL 0.9", "SDXL 1.0", "Other"]
+    BASE_MODELS = ["None", "SDXL 1.0", "SDXL 0.9", "SD 1.5","SD 1.4", "SD 2.0", "SD 2.0 768", "SD 2.1", "SD 2.1 768", "Other"]
 
     def prompt_for_limit(self):
         questions = [
@@ -417,20 +421,26 @@ class CivitaiCLI:
     def download_images(self, image_urls, save_path, base_name):
         if not image_urls:
             return
-        
+
         url = image_urls[0]  # Only get the first image
         try:
             response = requests.get(url)
             response.raise_for_status()
-            extension = os.path.splitext(url)[1]
-            image_save_path = os.path.join(save_path, f"{base_name}.jpeg")
 
-            with open(image_save_path, 'wb') as f:
-                f.write(response.content)
-                    
-            print(f"Downloaded image to {image_save_path}")
+            # Read the JPEG image into memory
+            img = Image.open(io.BytesIO(response.content))
+            
+            # Define the PNG save path
+            image_save_path = os.path.join(save_path, f"{base_name}.preview.png")
+
+            # Save the image as a PNG
+            img.save(image_save_path, 'PNG')
+
+            print(f"Downloaded and converted image to {image_save_path}")
         except requests.RequestException as e:
             print(f"Error downloading image {url}: {e}")
+        except Exception as e:
+            print(f"Could not convert image {url} to PNG: {e}")
 
     def prompt_for_versions(self, model_versions, existing_files):
         # Create a mapping of version names to IDs
@@ -586,6 +596,7 @@ class CivitaiCLI:
                                   f"Adjust image size (Currently: {self.image_size})",
                                   f"Set default download path (Currently: {self.download_path})",
                                   f"Set default NSFW filter (Currently: {self.default_nsfw_filter})",
+                                  f"Always download primary version? (Currently: {'Yes' if self.always_primary_version else 'No'})",  # New menu option
                                   "Back to main menu"
                               ],
                               carousel=True
@@ -601,9 +612,26 @@ class CivitaiCLI:
             elif 'Set default download path' in choice:
                 self.set_default_download_path()
             elif 'Set default NSFW filter' in choice:
-                self.set_default_nsfw_filter()  # New method for NSFW
+                self.set_default_nsfw_filter()
+            elif 'Always download primary version?' in choice:
+                self.set_default_version_choice()
+
             elif choice == 'Back to main menu':
                 return
+
+    def set_default_version_choice(self):
+        version_choices = ["Yes", "No"]
+        questions = [
+            inquirer.List('always_primary_version',
+                          message="Always download the primary version?",
+                          choices=version_choices,
+                          carousel=True
+                          ),
+        ]
+        answers = inquirer.prompt(questions)
+        self.always_primary_version = True if answers['always_primary_version'] == 'Yes' else False
+        self.save_settings()
+        print(f"Always download primary version set to: {self.always_primary_version}")
 
     def set_default_nsfw_filter(self):
         nsfw_choices = ["all", "nsfw", "sfw"]
@@ -654,6 +682,7 @@ class CivitaiCLI:
                     self.image_size = settings.get('image_size', self.SIZE_MAPPINGS['medium'])
                     self.download_path = settings.get('download_path', os.getcwd()) 
                     self.default_nsfw_filter = settings.get('default_nsfw_filter', 'sfw')  
+                    self.always_primary_version = settings.get('always_primary_version', True)  # New setting
 
             except json.JSONDecodeError:
                 print(f"Error decoding {SETTINGS_FILE}. Please ensure it's in valid JSON format.")
@@ -666,13 +695,14 @@ class CivitaiCLI:
             'image_size': self.image_size,
             'download_path': self.download_path,
             'default_nsfw_filter': self.default_nsfw_filter,
+            'always_primary_version': self.always_primary_version,  # New setting
         }
         try:
             with open(SETTINGS_FILE, 'w') as file:
                 json.dump(settings, file)
         except Exception as e:
             print(f"Error writing to {SETTINGS_FILE}: {e}")
-
+            
     def graceful_shutdown(self, signal_received, frame):
         # Here, you can add any cleanup logic if necessary
         print("\nCTRL+C detected. Exiting gracefully...")
