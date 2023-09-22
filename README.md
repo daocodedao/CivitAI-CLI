@@ -19,7 +19,7 @@ CivitAI-CLI is a command-line interface tool designed to interact with the Civit
 
 ## Installation
 
-To install and use CivitAI-CLI, clone this repository and ensure you have all the necessary dependencies installed.
+To install and use CivitAI-CLI, clone this repository and ensure you have all the necessary dependencies installed. You need to install imgcat too for it to work correctly (https://github.com/eddieantonio/imgcat.git)
 
 ```bash
 git clone https://github.com/roadmaus/CivitAI-CLI.git
