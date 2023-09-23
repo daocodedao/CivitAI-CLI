@@ -60,8 +60,8 @@ class CivitaiCLI:
             self.save_settings()
 
     def display_banner(self):
-        image_path = 'banner.jpeg'
-        os.system(f'imgcat --width=100 --height=30 {image_path}')
+        image_path = 'banner.png'
+        os.system(f'imgcat --height=30 {image_path}')   # --width=100 --height=30 
         
     def toggle_display_mode(self):
         self.display_mode = "images" if self.display_mode == "text" else "text"
