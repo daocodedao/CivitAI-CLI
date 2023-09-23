@@ -3,32 +3,34 @@
 
 ## Introduction
 
-CivitAI-CLI is a command-line interface tool designed to interact with the CivitAI API, making it easier to fetch, display, and download models hosted on [https://civitai.com](https://civitai.com).
+CivitAI-CLI is a command-line interface tool designed to interact with the CivitAI API. It allows users to efficiently fetch, display, list, and download models hosted on [CivitAI](https://civitai.com). While the tool offers several features without an API key, having one unlocks additional functionalities.
 
 ## Table of Contents
 
 - [Installation](#installation)
-- [Environment Variables](#environment-variables)
+- [Environment Variables (Optional)](#environment-variables-optional)
 - [Usage](#usage)
   - [Main Menu](#main-menu)
   - [Listing and Filtering Models](#listing-and-filtering-models)
   - [Fetching Models by ID](#fetching-models-by-id)
   - [Downloading Models](#downloading-models)
   - [Changing Display Mode](#changing-display-mode)
+  - [Settings Menu](#settings-menu)
+  - [Graceful Shutdown](#graceful-shutdown)
   - [Model Types](#model-types)
 
 ## Installation
 
-To install and use CivitAI-CLI, clone this repository and ensure you have all the necessary dependencies installed. You need to install imgcat too for it to work correctly (https://github.com/eddieantonio/imgcat.git)
+To install and use CivitAI-CLI, clone this repository and ensure you have all the necessary dependencies installed. Installing `imgcat` is also recommended for optimal functionality ([imgcat GitHub](https://github.com/eddieantonio/imgcat.git)).
 
 ```bash
 git clone https://github.com/roadmaus/CivitAI-CLI.git
 pip install -r requirements.txt
 ```
 
-## Environment Variables
+## Environment Variables (Optional)
 
-Make sure to set the `CIVITAI_API_KEY` environment variable with your API key. If this isn't set, the program will notify you and exit.
+Setting the `CIVITAI_API_KEY` environment variable with your API key is optional but recommended to unlock additional features. Without it, the program will still run, but with a gentle reminder of enhanced functionality with the API key.
 
 ```bash
 export CIVITAI_API_KEY=your_api_key_here
@@ -43,26 +45,35 @@ Upon launching the CLI, you'll be presented with various options:
 - Fetch model by ID
 - Download model by ID
 - Change display mode
+- Access settings menu
 
 ### Listing and Filtering Models
 
-You can list and apply multiple filters to the models, such as name, tag, creator's username, model type, sort order, time frame for sorting, and more. You can also save the results to a JSON file for further processing.
+List and apply multiple filters to the models based on criteria such as name, tag, creator's username, model type, sort order, time frame for sorting, and more. Results can also be saved to a JSON file for further processing.
 
 ### Fetching Models by ID
 
-Enter the model ID to fetch its details. Model details will be displayed in a concise format, showing essential details about the model, including its creator, description, stats, and version information.
+Enter the model ID to fetch its details. Model details will be displayed in a concise format, showcasing essential information such as the creator, description, stats, and version.
 
 ### Downloading Models
 
-Enter the model ID of the model you wish to download. You can specify the download directory or use the default directory.
+Specify the model ID to download the desired model. The download directory can be user-specified or defaulted. Related images can also be downloaded.
 
 ### Changing Display Mode
 
-Toggle between text-only mode and image display mode. In image display mode, a model's thumbnail will be displayed using `imgcat`.
+Toggle between text-only and image display modes. The image display mode utilizes `imgcat` to showcase a model's thumbnail.
+
+### Settings Menu
+
+Navigate through the settings menu to configure user preferences, including default version choice, NSFW filter, image size, and download path. The CLI will save and load your settings for future sessions.
+
+### Graceful Shutdown
+
+CivitAI-CLI ensures a graceful shutdown, completing any ongoing operations before exiting.
 
 ### Model Types
 
-The CLI categorizes models into several types:
+The CLI categorizes models into several types, including but not limited to:
 - Checkpoint
 - TextualInversion
 - Hypernetwork
@@ -78,4 +89,7 @@ The CLI categorizes models into several types:
 - Workflows
 - Other
 
-That's it! Explore the CLI and utilize CivitAI's vast resources efficiently. For any further questions or issues, please refer to the official CivitAI documentation or raise an issue on this repository.
+Explore CivitAI-CLI and make the most out of CivitAI's extensive resources. For further inquiries or issues, refer to the official CivitAI documentation or raise an issue on this repository.
+```
+
+This should provide a more accurate and detailed overview of the CivitAI-CLI tool.
