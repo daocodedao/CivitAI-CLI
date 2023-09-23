@@ -87,4 +87,3 @@ The CLI categorizes models into several types, including but not limited to:
 - Other
 
 Explore CivitAI-CLI and make the most out of CivitAI's extensive resources. For further inquiries or issues, refer to the official CivitAI documentation or raise an issue on this repository.
-```
