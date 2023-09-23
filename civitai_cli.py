@@ -16,7 +16,7 @@ from PIL import Image
 import io
 import time
 
-BASE_URL = "https://civitai.com/api/v1/models"
+#BASE_URL = "https://civitai.com/api/v1/models"
 MAX_LINE_WIDTH = 80
 SETTINGS_FILE = "civitai_settings.json"
 
@@ -29,9 +29,8 @@ class CivitaiCLI:
     BASE_URL = "https://civitai.com/api/v1/models"
     def __init__(self):
         self.api_token = os.environ.get("CIVITAI_API_KEY")
-        if not self.api_token:
-            print("Please set the CIVITAI_API_KEY environment variable with your API key.")
-            exit()
+        
+        # Initialize the other attributes before loading and saving settings
         self.current_params = {}
         self.current_base_model = None
         self.current_page = 1
@@ -40,10 +39,30 @@ class CivitaiCLI:
         self.download_path = os.getcwd()
         self.always_primary_version = True
         self.default_nsfw_filter = "sfw"
+        self.saved_models = None
+        
+        # Define the settings attribute as an empty dictionary before loading settings
+        self.settings = {}
         self.load_settings()
-        self.saved_models = None 
 
+        # Check if the API message has already been shown
+        if not self.api_token and not self.settings.get('api_message_shown'):
+            print("To enable filtering for favorites and to apply your personal CivitAI filter, please ensure that the CIVITAI_API_KEY environment variable is set with your API key. ...")
+            self.settings['api_message_shown'] = True
+            self.save_settings()
+        elif self.api_token:
+            print("API key detected. Personalized CivitAI filter and favorites will be enabled :)")
+        # Banner 
+        if not self.settings.get('banner_shown') or self.settings.get('always_show_banner', False):
+            self.display_banner()
+            if not self.settings.get('always_show_banner', False):
+                self.settings['banner_shown'] = True
+            self.save_settings()
 
+    def display_banner(self):
+        image_path = 'banner.jpeg'
+        os.system(f'imgcat --width=100 --height=30 {image_path}')
+        
     def toggle_display_mode(self):
         self.display_mode = "images" if self.display_mode == "text" else "text"
         print(f"Switched display mode to {self.display_mode}.")
@@ -620,7 +639,8 @@ class CivitaiCLI:
                                   f"Adjust image size (Currently: {self.image_size})",
                                   f"Set default download path (Currently: {self.download_path})",
                                   f"Set default NSFW filter (Currently: {self.default_nsfw_filter})",
-                                  f"Always download primary version? (Currently: {'Yes' if self.always_primary_version else 'No'})",  # New menu option
+                                  f"Always download primary version? (Currently: {'Yes' if self.always_primary_version else 'No'})",
+                                  f"Always show banner at startup? (Currently: {'Yes' if self.settings.get('always_show_banner', False) else 'No'})",  # New menu option
                                   "Back to main menu"
                               ],
                               carousel=True
@@ -639,9 +659,13 @@ class CivitaiCLI:
                 self.set_default_nsfw_filter()
             elif 'Always download primary version?' in choice:
                 self.set_default_version_choice()
+            elif 'Always show banner at startup?' in choice:
+                self.settings['always_show_banner'] = not self.settings.get('always_show_banner', False)
+                self.save_settings()
 
             elif choice == 'Back to main menu':
                 return
+
 
     def set_default_version_choice(self):
         version_choices = ["Yes", "No"]
@@ -704,28 +728,39 @@ class CivitaiCLI:
                     settings = json.load(file)
                     self.display_mode = settings.get('display_mode', 'text')
                     self.image_size = settings.get('image_size', self.SIZE_MAPPINGS['medium'])
-                    self.download_path = settings.get('download_path', os.getcwd()) 
-                    self.default_nsfw_filter = settings.get('default_nsfw_filter', 'sfw')  
-                    self.always_primary_version = settings.get('always_primary_version', True)  # New setting
-
+                    self.download_path = settings.get('download_path', os.getcwd())
+                    self.default_nsfw_filter = settings.get('default_nsfw_filter', 'sfw')
+                    self.always_primary_version = settings.get('always_primary_version', True)
+                    
+                    # Add these lines to load the two keys
+                    self.settings['api_message_shown'] = settings.get('api_message_shown', False)
+                    self.settings['banner_shown'] = settings.get('banner_shown', False)                    
+                    self.settings['always_show_banner'] = settings.get('always_show_banner', False)
+                        
             except json.JSONDecodeError:
                 print(f"Error decoding {SETTINGS_FILE}. Please ensure it's in valid JSON format.")
             except Exception as e:
                 print(f"Error reading from {SETTINGS_FILE}: {e}")
-
+                
     def save_settings(self):
         settings = {
             'display_mode': self.display_mode,
             'image_size': self.image_size,
             'download_path': self.download_path,
             'default_nsfw_filter': self.default_nsfw_filter,
-            'always_primary_version': self.always_primary_version,  # New setting
+            'always_primary_version': self.always_primary_version,
+            
+            # Add these lines to save the two keys
+            'api_message_shown': self.settings.get('api_message_shown', False),
+            'banner_shown': self.settings.get('banner_shown', False),
+            'always_show_banner': self.settings.get('always_show_banner', False),
         }
         try:
             with open(SETTINGS_FILE, 'w') as file:
                 json.dump(settings, file)
         except Exception as e:
             print(f"Error writing to {SETTINGS_FILE}: {e}")
+
 
     def graceful_shutdown(self, signal_received, frame):
         # Here, you can add any cleanup logic if necessary
