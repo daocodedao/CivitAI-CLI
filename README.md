@@ -67,9 +67,6 @@ Toggle between text-only and image display modes. The image display mode utilize
 
 Navigate through the settings menu to configure user preferences, including default version choice, NSFW filter, image size, and download path. The CLI will save and load your settings for future sessions.
 
-### Graceful Shutdown
-
-CivitAI-CLI ensures a graceful shutdown, completing any ongoing operations before exiting.
 
 ### Model Types
 
@@ -91,5 +88,3 @@ The CLI categorizes models into several types, including but not limited to:
 
 Explore CivitAI-CLI and make the most out of CivitAI's extensive resources. For further inquiries or issues, refer to the official CivitAI documentation or raise an issue on this repository.
 ```
-
-This should provide a more accurate and detailed overview of the CivitAI-CLI tool.
