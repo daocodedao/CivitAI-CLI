@@ -1,4 +1,4 @@
-
+![Banner](banner.png)
 # CivitAI-CLI
 
 ## Introduction
