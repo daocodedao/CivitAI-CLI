@@ -39,6 +39,7 @@ class CivitaiCLI:
         self.image_size = self.SIZE_MAPPINGS['medium']
         self.download_path = os.getcwd()
         self.always_primary_version = True
+        self.default_nsfw_filter = "sfw"
         self.load_settings()
         self.saved_models = None 
 
@@ -68,7 +69,6 @@ class CivitaiCLI:
             "allowDerivatives": kwargs.get("allowDerivatives"),
             "allowDifferentLicenses": kwargs.get("allowDifferentLicenses"),
             "nsfw": str(kwargs.get("nsfw")).lower() if kwargs.get("nsfw") is not None else None,
-            # Corrected the key to "baseModel"
             "baseModel": kwargs.get("base_model")
         }
         
@@ -273,7 +273,7 @@ class CivitaiCLI:
         # ANSI escape code to reset to default
         RESET = '\033[0m'
         
-        print(ORANGE + '-' * 250 + RESET)
+        print(ORANGE + '-' * 190 + RESET)
 
     def list_all_models(self, api_token=None, resume=False):
         fetching_page = False
