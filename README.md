@@ -44,8 +44,8 @@ Upon launching the CLI, you'll be presented with various options:
 - List and filter models
 - Fetch model by ID
 - Download model by ID
-- Change display mode
 - Access settings menu
+- Exit application
 
 ### Listing and Filtering Models
 
@@ -59,9 +59,6 @@ Enter the model ID to fetch its details. Model details will be displayed in a co
 
 Specify the model ID to download the desired model. The download directory can be user-specified or defaulted. Related images can also be downloaded.
 
-### Changing Display Mode
-
-Toggle between text-only and image display modes. The image display mode utilizes `imgcat` to showcase a model's thumbnail.
 
 ### Settings Menu
 
