@@ -16,7 +16,7 @@ from PIL import Image
 import io
 import time
 
-#BASE_URL = "https://civitai.com/api/v1/models"
+BASE_URL = "https://civitai.com/api/v1/models"
 MAX_LINE_WIDTH = 80
 SETTINGS_FILE = "civitai_settings.json"
 
