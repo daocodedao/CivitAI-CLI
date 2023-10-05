@@ -32,7 +32,7 @@ class MainCLI:
         self.selected_models_to_download = []
         self.BASE_MODELS = ["SDXL 1.0", "SDXL 0.9", "SD 1.5","SD 1.4", "SD 2.0", "SD 2.0 768", "SD 2.1", "SD 2.1 768", "Other"]
         #print("DEBUG: Entering main_menu")
-        print(f"DEBUG: MainCLI Initialized - image_filter: {self.settings_cli.image_filter}")
+        #print(f"DEBUG: MainCLI Initialized - image_filter: {self.settings_cli.image_filter}")
     def main_menu(self):
         questions = [
             List('choice',
@@ -76,9 +76,9 @@ class MainCLI:
         temporary_query = None
 
         while True:
-            print(f"Debug: Current temporary_query = {temporary_query}")  # Debug statement
-            print(f"Debug: Current default_query = {self.model_display.default_query}")  # Debug statement
-            print(f"DEBUG: list_models_menu - image_filter: {self.settings_cli.image_filter}")
+            #print(f"Debug: Current temporary_query = {temporary_query}")  # Debug statement
+            #print(f"Debug: Current default_query = {self.model_display.default_query}")  # Debug statement
+            #print(f"DEBUG: list_models_menu - image_filter: {self.settings_cli.image_filter}")
             if reload_page:
                 if temporary_query:
                     query = {**temporary_query, 'page': current_page}
@@ -95,7 +95,7 @@ class MainCLI:
                     # Access image_filter from settings_cli and pass it to display_model_card
                     self.model_display.display_model_card(model, self.settings_cli.image_filter)
                     # Debug: Print image_filter value
-                    print(f"DEBUG: Current image_filter = {self.settings_cli.image_filter}")
+                    #print(f"DEBUG: Current image_filter = {self.settings_cli.image_filter}")
 
 
                 reload_page = False  # <-- Change here: reset to False after loading the page
@@ -125,7 +125,7 @@ class MainCLI:
             if action == 'Next page':
                 if current_page < total_pages:
                     current_page += 1
-                    print("Debug: Current Page updated to ", current_page)
+                    #print("Debug: Current Page updated to ", current_page)
                     reload_page = True
                 else:
                     print("You're already on the last page.")
@@ -133,7 +133,7 @@ class MainCLI:
             elif action == 'Previous page':
                 if current_page > 1:
                     current_page -= 1
-                    print("Debug: Current Page updated to ", current_page)
+                    #print("Debug: Current Page updated to ", current_page)
                     reload_page = True
                 else:
                     print("You're already on the first page.")
@@ -184,7 +184,7 @@ class MainCLI:
                     # Access image_filter from settings_cli and pass it to display_model_card
                     self.model_display.display_model_card(model, self.settings_cli.image_filter)
                     # Debug: Print image_filter value
-                    print(f"DEBUG: Current image_filter = {self.settings_cli.image_filter}")
+                    #print(f"DEBUG: Current image_filter = {self.settings_cli.image_filter}")
 
                 reload_page = False
 
@@ -259,7 +259,7 @@ class MainCLI:
                 # Prepare choices based on currently displayed models
                 choices = [
                     (model.get('name', 'Unknown'), model.get('id', None))
-                    for model in models  # <-- Adjusted this line
+                    for model in models  
                 ]
                 
                 info_question = [
@@ -276,7 +276,7 @@ class MainCLI:
                         # Use your actual method to fetch more info here.
                         model_version = self.settings_cli.api_handler.get_model_by_id(model_id)
                         if model_version:
-                            self.model_display.display_model_version_details(model_version)
+                            self.model_display.display_model_version_details(model, self.settings_cli.image_filter)
                         else:
                             print(f"No detailed information available for model ID: {model_id}")
                 else:
@@ -287,23 +287,8 @@ class MainCLI:
 
             elif action == 'Back to main menu':
                 temporary_query = None  # Resetting the temporary query
-                print("Debug: Cleared temporary_query")  # Debug statement
+                #print("Debug: Cleared temporary_query")  # Debug statement
                 break
-
-    # def filter_menu(self, temporary_query):
-    #     filter_question = [
-    #         List('filter_action',
-    #              message='What filter action would you like to take?',
-    #              choices=['Edit current search', 'Start a new search', 'Clear all filters'])
-    #     ]
-    #     filter_ans = prompt(filter_question)['filter_action']
-
-    #     if filter_ans == 'Edit current search':
-    #         self.edit_current_search(temporary_query)
-    #     elif filter_ans == 'Start a new search':
-    #         self.start_new_search(temporary_query)
-    #     elif filter_ans == 'Clear all filters':
-    #         temporary_query.clear()
 
     def download_metadata_menu(self):
         questions = [
@@ -375,11 +360,20 @@ class SettingsCLI:
         try:
             with open('query_settings.json', 'r') as f:
                 self.model_display.default_query = json.load(f)
-            print("Loaded query settings:", self.model_display.default_query)
+            #print("Loaded query settings:", self.model_display.default_query)
         except FileNotFoundError:
             self.model_display.default_query = {}
             print("No query settings file found. Using default settings.")
 
+    def validate_image_filter(self, image_filter):
+        nsfw_types = ['Soft', 'Mature', 'X']
+        actions = ['allow', 'block', 'blockify']
+        if not isinstance(image_filter, dict):
+            return False
+        for nsfw_type, action in image_filter.items():
+            if nsfw_type not in nsfw_types or action not in actions:
+                return False
+        return True
 
     def load_settings(self):
         try:
@@ -387,20 +381,17 @@ class SettingsCLI:
                 settings = json.load(f)
             self.model_display.text_only = settings.get('text_only', False)
             self.model_display.size = settings.get('size', 'medium')
-            # First, get the image_filter value from the file
-            # if it's not found, set it to 'block nsfw'
-            self.image_filter = settings.get('image_filter', 'block nsfw')
+            self.image_filter = settings.get('image_filter', {'Soft': 'allow', 'Mature': 'block', 'X': 'blockify'})
+            if not self.validate_image_filter(self.image_filter):
+                print("Warning: Invalid image filter settings found. Using default settings.")
+                self.image_filter = {'Soft': 'blockify', 'Mature': 'block', 'X': 'block'}
             print(f"DEBUG: Loaded image_filter = {self.image_filter}")  # Debug print
             self.root_directory = settings.get('root_directory', os.path.join(os.path.expanduser("~"), 'Downloads'))
         except FileNotFoundError:
             print("Settings file not found. Using default settings.")
-            # If the settings file is not found, set image_filter to 'block nsfw'
-            self.image_filter = 'block nsfw'
+            self.image_filter = {'Soft': 'blockify', 'Mature': 'block', 'X': 'block'}
             self.root_directory = os.path.join(os.path.expanduser("~"), 'Downloads')
 
-
-
-            
     def settings_menu(self):
         while True:
             questions = [
@@ -410,7 +401,6 @@ class SettingsCLI:
                          'Change display mode',
                          'Adjust image size',
                          'Set default query',
-                         #'Set model version preference',
                          'Set image filter',
                          'Set root directory',
                          'Back to main menu'],
@@ -422,7 +412,6 @@ class SettingsCLI:
                 'Change display mode': self.change_display_mode,
                 'Adjust image size': self.adjust_image_size,
                 'Set default query': self.set_default_query,
-                #'Set model version preference': self.set_model_version_preference,
                 'Set image filter': self.set_image_filter,
                 'Set root directory': self.set_root_directory,
                 'Back to main menu': self.exit_menu,
@@ -528,28 +517,34 @@ class SettingsCLI:
             self.save_query_settings()
 
     def set_image_filter(self):
-        questions = [
-            List('choice',
-                 message="Choose an image filter:",
-                 choices=['Block NSFW', 'Blockify Images', 'Allow All Images'],
-                 )
-        ]
-        choice = prompt(questions)['choice']
-        self.image_filter = choice.lower()
+        nsfw_types = ['Soft', 'Mature', 'X']  # NSFW categories
+        actions = ['Allow', 'Block', 'Blockify']  # Possible actions
+        
+        image_filter_settings = {}  # To store user preferences
+        
+        print("Choose an action for the following content types:")
+        for nsfw_type in nsfw_types:
+            print(f"{nsfw_type} Content:")
+            for i, action in enumerate(actions, 1):
+                print(f"    [{i}] {action}")
+            
+            # Capture user choice and ensure it is valid
+            while True:
+                try:
+                    user_choice = int(input(f"Your choice for {nsfw_type} content (1/2/3): "))
+                    if user_choice not in [1, 2, 3]:
+                        raise ValueError("Invalid choice")
+                    image_filter_settings[nsfw_type] = actions[user_choice - 1].lower()
+                    break  # Exit the loop if input is valid
+                except ValueError as e:
+                    print(e)
+                    print("Invalid input. Please choose 1, 2, or 3.")
+        
+        # Save settings
+        self.image_filter = image_filter_settings
         self.save_settings()
-        print(f"Image filter changed to {choice}.")
+        print("Image filter settings have been changed.")
 
-    # def set_model_version_preference(self):
-    #     questions = [
-    #         List('choice',
-    #              message="Choose your preference for downloading model versions:",
-    #              choices=['Primary Version Only', 'Prompt for Version'],
-    #              )
-    #     ]
-    #     choice = prompt(questions)['choice']
-    #     self.model_version_preference = 'primary' if choice == 'Primary Version Only' else 'prompt'
-    #     self.save_settings()
-    #     print(f"Model version preference set to {choice}.")
 
     def set_root_directory(self):
         questions = [
@@ -605,7 +600,7 @@ class SettingsCLI:
         print("Query settings saved successfully.")
 
     def exit_menu(self):
-        print("Exiting settings menu. Have a great day!")
+        #print("Exiting settings menu. Have a great day!")
         return
 
 
@@ -627,18 +622,18 @@ class APIHandler:
 
     def get_models(self):
         query = self.model_display.default_query if hasattr(self.model_display, 'default_query') else {}
-        print("Debug: Final query to API: ", query)
+        #print("Debug: Final query to API: ", query)
         endpoint = f"{self.BASE_URL}models"
-        print(f"DEBUG: Calling API URL {endpoint}")  # Debug print
+        #print(f"DEBUG: Calling API URL {endpoint}")  # Debug print
 
-        max_retries = 5  # Maximum number of retries
+        max_retries = 10  # Maximum number of retries
         retry_count = 0  # Initialize retry count
 
         while retry_count < max_retries:
             response = requests.get(endpoint)
 
             if response.status_code == 200:
-                print("DEBUG: Successful API call to get_models.")
+                #print("DEBUG: Successful API call to get_models.")
                 return response.json()
             
             elif 400 <= response.status_code < 500:
@@ -690,9 +685,9 @@ class APIHandler:
 
         # Preprocess the query
         query_dict = self.preprocess_query(query_dict)
-        print("Debug: Final query to API: ", query_dict)
+        #print("Debug: Final query to API: ", query_dict)
         endpoint = f"{self.BASE_URL}models"
-        print(f"DEBUG: Calling API URL {endpoint} with query {query_dict}")
+        #print(f"DEBUG: Calling API URL {endpoint} with query {query_dict}")
 
         max_retries = 5  # Maximum number of retries
         retry_count = 0  # Initialize retry count
@@ -701,7 +696,7 @@ class APIHandler:
             response = requests.get(endpoint, params=query_dict, headers=headers)
 
             if response.status_code == 200:
-                print("DEBUG: Successful API call to get_models_with_default_query.")
+                #print("DEBUG: Successful API call to get_models_with_default_query.")
                 api_results = response.json()
                 base_model = query_dict.get('base_model')
                 nsfw_only = query_dict.get('nsfw') == 'true'
@@ -932,12 +927,12 @@ class Downloader:
                     
                     # Extract the name without extension to use for metadata
                     model_name, _ = os.path.splitext(downloaded_file_name)
-                    
-                    # Fetch metadata
-                    self.download_metadata(model_version_id, model_type, model_name)
 
                     # Make sure the directory exists; if not, create it
                     os.makedirs(final_download_path, exist_ok=True)
+
+                    # Fetch metadata
+                    self.download_metadata(model_version_id, model_type, model_name)
 
                     # Move the file to the final destination
                     try:
@@ -1088,7 +1083,7 @@ class Downloader:
     def _save_metadata(self, model_version_details, model_type, model_name, model_details, folder=None):
         print(f"Saving metadata for {model_name} ({model_type})...")
         download_folder = self.get_download_path(model_type) if folder is None else folder
-        print(f"Metadata will be saved to: {download_folder}")
+        #print(f"Metadata will be saved to: {download_folder}")
         # Determine the folder based on the model type
 
         # Debug print statements
@@ -1156,31 +1151,168 @@ class ModelDisplay:
     @staticmethod
     def get_scan_color(status):
         if status == 'Success':
-            return '\033[92m'  # Light Green
+            return '\033[32m'  # Light Green
         elif status == 'Partial Success':
-            return '\033[32m'  # Green
+            return '\033[92m'  # Green
         elif status == 'Pending':
             return '\033[33m'  # Yellow
         else:
             return '\033[91m'  # Light Red
 
+    def display_model_card(self, model, image_filter_settings):
+        correction_factor = 1.9
+        model_name = model.get('name', 'N/A')
+        total_length = 125  
+        padding_length = (total_length - len(model_name)) // 2  
+        reset_color = '\033[0m\033[49m'
+        separator = f"{'.' * padding_length}\033[1m{model_name}\033[0m{'.' * (total_length - len(model_name) - padding_length)}"
+        print(separator)
+        print()
+
+        # Print Basic Info
+        print(f"🆔 ID: {model.get('id', 'N/A')}")
+        base_url = "https://civitai.com/models/"
+        model_id = model.get('id', 'N/A')
+        full_url = f"{base_url}{model_id}"
+        print(f"🌐 URL: \033[94m\033[4m{full_url}\033[0m")
+        print(f"📛 Name: {model.get('name', 'N/A')}")
+        print(f"👤 Creator: {model.get('creator', {}).get('username', 'N/A')}")
+        print(f"🤖 Type: {model.get('type', 'N/A')}")
+        # Fetch model versions to display base model information
+        model_versions = model.get('modelVersions', [])
+        if model_versions:
+            base_models = set(version.get('baseModel', 'N/A') for version in model_versions)
+            base_models_str = ', '.join(base_models)
+            files_info = model_versions[0].get('files', [{}])  # Get the first file info dictionary from the list, or an empty dict if not available
+            size_kb = files_info[0].get('sizeKB', 'N/A') if files_info else 'N/A'
+            if size_kb != 'N/A':
+                size_kb = self.convert_size(size_kb)
+            pickle_scan = files_info[0].get('pickleScanResult', 'N/A')
+            virus_scan = files_info[0].get('virusScanResult', 'N/A')
+            scanned_at = files_info[0].get('scannedAt', 'N/A')
+            pickle_scan_color = self.get_scan_color(pickle_scan)
+            virus_scan_color = self.get_scan_color(virus_scan)
+        else:
+            base_models_str = 'N/A'
+            size_kb = 'N/A'
+            pickle_scan = 'N/A'
+            virus_scan = 'N/A'
+            pickle_scan_color = self.get_scan_color('N/A')
+            virus_scan_color = self.get_scan_color('N/A')
+            scanned_at = 'N/A'
+
+        print(f"🛠️ Base Models: {base_models_str}")
+        print(f"⭐ Rating: {model.get('stats', {}).get('rating', 'N/A')}")
+        print(f"🔞 NSFW: {model.get('nsfw', 'N/A')}")
+        print(f"🏷️ Tags: {', '.join(model.get('tags', ['N/A']))}")
+        print(f"📦 File Size: \033[1m{size_kb}\033[0m")
+        print("\n-- Scans --")
+        print(f"🥒 Pickle Scan: {pickle_scan_color}{pickle_scan}{reset_color}")
+        print(f"🔬 Virus Scan: {virus_scan_color}{virus_scan}{reset_color}")
+        print(f"🗓️ Scanned At: {scanned_at}")
+        print("\n-- Description --")
+        raw_description = model.get('description', '')
+        if raw_description:
+            stripped_description = re.sub('<.*?>', '', raw_description)
+            truncated_description = (stripped_description[:200] + '...') if len(stripped_description) > 200 else stripped_description
+        else:
+            truncated_description = 'N/A'
+        print(f"\n📝 Description: {truncated_description}\n")
+        print( )
+        # Safely fetch image URL
+        model_versions = model.get('modelVersions', [])
+        if model_versions:
+            images = model_versions[0].get('images', [])
+            if images:
+                image_url = images[0].get('url', 'N/A')
+            else:
+                image_url = 'N/A'
+        else:
+            image_url = 'N/A'
+
+        #print(f"Image URL: {image_url}")
+        if not self.text_only:
+            nsfw_warning_displayed = False  
+
+            for model_version in model.get('modelVersions', []):
+                for image in model_version.get('images', []):
+                    image_url = image.get('url', 'N/A')
+                    nsfw_status = image.get('nsfw', 'None')  # Get NSFW status of the image
+                    
+                    action = image_filter_settings.get(nsfw_status, 'allow')
+                    
+                    if action == 'block':
+                        if not nsfw_warning_displayed:
+                            print(f"⚠️ {nsfw_status} content is blocked")
+                            nsfw_warning_displayed = True
+                        continue  
+
+                    elif action == 'blockify':
+                        print(f"⚠️ {nsfw_status} content is blockified")
+                    
+                    # Image fetching and displaying logic
+                    if image_url != 'N/A':
+                        try:
+                            # Fetch and save the image data
+                            image_data = requests.get(image_url).content
+                            image_format = imghdr.what(None, image_data)  
+
+                            if image_format not in {"png", "jpeg", "gif"}:
+                                raise Image.UnidentifiedImageError("Unsupported image format")
+                            
+                            with NamedTemporaryFile(suffix=f".{image_format}", delete=True) as temp_file:
+                                temp_file.write(image_data)
+                                temp_file.flush()
+
+                                with Image.open(temp_file.name) as img:
+                                    width, height = img.size
+
+                                aspect_ratio = width / height
+                                new_height = self.size_mapping.get(self.size, 80)  
+                                correction_factor = 1.9
+                                new_width = int(new_height * aspect_ratio * correction_factor)
+
+                                # If action is 'blockify', use the -b option in viu
+                                if action == 'blockify':
+                                    subprocess.run(["viu", "-b", "-w", str(new_width), "-h", str(new_height), temp_file.name])
+                                else:
+                                    subprocess.run(["viu", "-w", str(new_width), "-h", str(new_height), temp_file.name])
+
+                                return  
+
+                        except requests.RequestException:
+                            print(f"🚫 Failed to fetch image from {image_url}")
+                        except Image.UnidentifiedImageError:
+                            print(f"🐟 Image from {image_url} not recognized")
+                        except subprocess.CalledProcessError:
+                            print("⚠️ Failed to run viu")
+                        except Exception as e:
+                            print(f"🚫 An unexpected error occurred: {str(e)}")
+            # If the code reaches here, no image could be displayed
+            print("⚠️ No image could be displayed")
+            print(".")
 
 
-    def display_model_card(self, model, image_filter):
+    
+    def display_model_version_details(self, model, image_filter_settings):
         correction_factor = 1.9
         model_name = model.get('name', 'N/A')
         total_length = 125  # Total length of the separator line
         padding_length = (total_length - len(model_name)) // 2  # Calculate padding for each side
-        # ANSI code for bold: \033[1m for start, \033[0m for end
-        # Reset ANSI code
         reset_color = '\033[0m\033[49m'
         separator = f"{'.' * padding_length}\033[1m{model_name}\033[0m{'.' * (total_length - len(model_name) - padding_length)}"
         print(separator)
-        print( )
-        print( )
+        print()
+        print()
 
         print(f"🆔 ID: {model.get('id', 'N/A')}")
-        #print(f"🌐 URL: {model.get('url', 'N/A')}")
+        
+        # Construct and print the URL
+        base_url = "https://civitai.com/models/"
+        model_id = model.get('id', 'N/A')
+        full_url = f"{base_url}{model_id}"
+        print(f"🌐 URL: \033[94m\033[4m{full_url}\033[0m")
+        
         print(f"📛 Name: {model.get('name', 'N/A')}")
         print(f"👤 Creator: {model.get('creator', {}).get('username', 'N/A')}")
         print(f"🤖 Type: {model.get('type', 'N/A')}")
@@ -1219,7 +1351,7 @@ class ModelDisplay:
         raw_description = model.get('description', '')
         if raw_description:
             stripped_description = re.sub('<.*?>', '', raw_description)
-            truncated_description = (stripped_description[:100] + '...') if len(stripped_description) > 100 else stripped_description
+            truncated_description = (stripped_description[:500] + '...') if len(stripped_description) > 100 else stripped_description
         else:
             truncated_description = 'N/A'
         
@@ -1238,35 +1370,31 @@ class ModelDisplay:
 
         #print(f"Image URL: {image_url}")
         if not self.text_only:
-            nsfw_warning_displayed = False  # Flag to track if NSFW warning has been displayed
+            nsfw_warning_displayed = False  
 
             for model_version in model.get('modelVersions', []):
                 for image in model_version.get('images', []):
                     image_url = image.get('url', 'N/A')
                     nsfw_status = image.get('nsfw', 'None')  # Get NSFW status of the image
                     
-                    # Debugging: Print the NSFW status of the image
-                    #print(f"DEBUG: Image NSFW status = {nsfw_status}")
-
-                    # Check the NSFW status against the filter setting
-                    blockify_image = False
-                    if image_filter == 'block nsfw' and nsfw_status in ['Mature', 'X']:
+                    action = image_filter_settings.get(nsfw_status, 'allow')
+                    
+                    if action == 'block':
                         if not nsfw_warning_displayed:
-                            print("⚠️ NSFW content is blocked")
-                            nsfw_warning_displayed = True  # Set the flag to True
-                        continue  # Skip the current image and continue with the next one
-                    elif image_filter == 'block nsfw' and nsfw_status == 'Soft':
-                        blockify_image = True
-                    elif image_filter == 'blockify images' and nsfw_status in ['Soft', 'Mature', 'X']:
-                        blockify_image = True
+                            print(f"⚠️ {nsfw_status} content is blocked")
+                            nsfw_warning_displayed = True
+                        continue  
 
+                    elif action == 'blockify':
+                        print(f"⚠️ {nsfw_status} content is blockified")
+                    
+                    # Image fetching and displaying logic
                     if image_url != 'N/A':
                         try:
                             # Fetch and save the image data
                             image_data = requests.get(image_url).content
-                            image_format = imghdr.what(None, image_data)  # Determine image format
-                            
-                            # If image format is unrecognized, raise an exception
+                            image_format = imghdr.what(None, image_data)  
+
                             if image_format not in {"png", "jpeg", "gif"}:
                                 raise Image.UnidentifiedImageError("Unsupported image format")
                             
@@ -1274,25 +1402,22 @@ class ModelDisplay:
                                 temp_file.write(image_data)
                                 temp_file.flush()
 
-                                # Open the image to get its dimensions
                                 with Image.open(temp_file.name) as img:
                                     width, height = img.size
 
-                                # Calculate the aspect ratio
                                 aspect_ratio = width / height
-
-                                # Determine the number of rows based on the size setting
-                                new_height = self.size_mapping.get(self.size, 80)  # Default to 'medium'
+                                new_height = self.size_mapping.get(self.size, 80)  
+                                correction_factor = 1.9
                                 new_width = int(new_height * aspect_ratio * correction_factor)
 
-                                # If blockify_image is True, use the -b option in viu
-                                if blockify_image:
+                                # If action is 'blockify', use the -b option in viu
+                                if action == 'blockify':
                                     subprocess.run(["viu", "-b", "-w", str(new_width), "-h", str(new_height), temp_file.name])
                                 else:
-                                    # Display the image using viu
                                     subprocess.run(["viu", "-w", str(new_width), "-h", str(new_height), temp_file.name])
 
-                                return  # Exit the function if the image is displayed successfully
+                                return  
+
                         except requests.RequestException:
                             print(f"🚫 Failed to fetch image from {image_url}")
                         except Image.UnidentifiedImageError:
@@ -1303,59 +1428,7 @@ class ModelDisplay:
                             print(f"🚫 An unexpected error occurred: {str(e)}")
             # If the code reaches here, no image could be displayed
             print("⚠️ No image could be displayed")
-            print(".")
-
-    
-    def display_model_version_details(self, model_version):
-        # ANSI code for bold: \033[1m for start, \033[0m for end
-        # Reset ANSI code
-        reset_color = '\033[0m\033[49m'
-        
-        model_name = model_version.get('name', 'N/A')
-        total_length = 125  # Total length of the separator line
-        padding_length = (total_length - len(model_name)) // 2  # Calculate padding for each side
-        separator = f"{'.' * padding_length}\033[1m{model_name}\033[0m{'.' * (total_length - len(model_name) - padding_length)}"
-        print(separator)
-        print( )
-        print( )
-
-        print(f"🆔 ID: {model_version.get('id', 'N/A')}")
-        print(f"📛 Name: {model_version.get('name', 'N/A')}")
-        print(f"🤖 Type: {model_version.get('type', 'N/A')}")
-        
-        base_model = model_version.get('baseModel', 'N/A')
-        size_kb = model_version.get('sizeKB', 'N/A')
-        pickle_scan = model_version.get('pickleScanResult', 'N/A')
-        virus_scan = model_version.get('virusScanResult', 'N/A')
-        scanned_at = model_version.get('scannedAt', 'N/A')
-        
-        print(f"🛠️ Base Model: {base_model}")
-        print(f"⭐ Rating: {model_version.get('stats', {}).get('rating', 'N/A')}")
-        print(f"🔞 NSFW: {model_version.get('nsfw', 'N/A')}")
-        print(f"🏷️ Tags: {model_version.get('tags', 'N/A')}")
-        print(f"📦 File Size: {size_kb}")
-        print(f"🥒 Pickle Scan: {pickle_scan}")
-        print(f"🔬 Virus Scan: {virus_scan}")
-        print(f"🗓️ Scanned At: {scanned_at}")    
-
-        raw_description = model_version.get('description', '')
-        if raw_description:
-            stripped_description = re.sub('<.*?>', '', raw_description)
-        else:
-            stripped_description = 'N/A'
-        
-        print(f"\n📝 Description: {stripped_description}")
-        print( )
-        # Safely fetch image URL
-        images = model_version.get('images', [])
-        if images:
-            image_url = images[0].get('url', 'N/A')
-        else:
-            image_url = 'N/A'
-
-        # Display image URL or other relevant information
-        print(f"🖼️ Image URL: {image_url}")
-        print( )
+            print(".")        
 
 
     def display_model_by_hash(self, model_by_hash):
