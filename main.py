@@ -1207,7 +1207,7 @@ class ModelDisplay:
         print(f"🏷️ Tags: {', '.join(model.get('tags', ['N/A']))}")
         print(f"📦 File Size: \033[1m{size_kb}\033[0m")
         print("\n-- Scans --")
-        print(f"🥒 Pickle Scan: {pickle_scan_color}{pickle_scan}{reset_color}")
+        print(f"🐍 Pickle Scan: {pickle_scan_color}{pickle_scan}{reset_color}")
         print(f"🔬 Virus Scan: {virus_scan_color}{virus_scan}{reset_color}")
         print(f"🗓️ Scanned At: {scanned_at}")
         print("\n-- Description --")
@@ -1344,7 +1344,7 @@ class ModelDisplay:
         print(f"🔞 NSFW: {model.get('nsfw', 'N/A')}")
         print(f"🏷️ Tags: {model.get('tags', 'N/A')}")
         print(f"📦 File Size: {size_kb}")
-        print(f"🥒 Pickle Scan: {pickle_scan_color}{pickle_scan}{reset_color}")
+        print(f"🐍 Pickle Scan: {pickle_scan_color}{pickle_scan}{reset_color}")
         print(f"🔬 Virus Scan: {virus_scan_color}{virus_scan}{reset_color}")
         print(f"🗓️ Scanned At: {scanned_at}")    
 
