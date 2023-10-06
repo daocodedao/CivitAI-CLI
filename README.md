@@ -149,11 +149,11 @@ CivitAI-CLI presently allows users to:
 - Download models
 - Fetch model info
 - Set a default query and download path (aligns with Automatic1111's webui directory structure)
-- Scan for missing metadata (and replace if not in the same format)
+- Scan for missing metadata (currently it replaces old metadata if not in the same format)
 - Switch display mode between Text only or Image
 - Adjust image sizes
 - Set a content filter for images (options: block, blur, or show)
-- Resume interrupted downloads
+- Resume interrupted downloads (partially implemented)
 
 ### To-Do
 Future updates aim to provide:
