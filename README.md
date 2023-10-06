@@ -45,7 +45,7 @@ python3 -m venv venv
 source venv/bin/activate
 ```
 
-**Note:** Ensure your shell is in the directory where `venv` is created.
+**Note:** Ensure your shell is in the directory where `venv` is created. Also windows support is not tested yet and will likely break.
 
 ### Install Dependencies
 With the virtual environment activated, install the dependencies:
