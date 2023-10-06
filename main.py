@@ -100,8 +100,6 @@ class MainCLI:
 
                 reload_page = False  # <-- Change here: reset to False after loading the page
 
-
-            # Menu options
             # Menu options
             pagination_choices = ['Next page', 'Previous page', 'Jump to page'] if total_pages > 1 else []
             menu_question = [
@@ -1132,12 +1130,37 @@ class Downloader:
                 print(f"Failed to download image from {image_url}.")
 
         print(f"Successfully downloaded and saved metadata for {model_name}.")
-
+        
 class ModelDisplay:
     def __init__(self, size='medium', text_only=False):
         self.size = size  # 'small', 'medium', 'large'
         self.text_only = text_only
-        self.size_mapping = {'small': 40, 'medium': 80, 'large': 100}  # rows
+        self.terminal_type = self._detect_terminal_type()
+        self.size_mapping = self._get_size_mapping()
+
+    def _detect_terminal_type(self):
+        term = os.getenv("TERM", "")
+        colorterm = os.getenv("COLORTERM", "")
+        if term in ["xterm-kitty", "xterm-iterm"] and not self.text_only:
+            # Supports graphics protocol
+            return "image"
+        elif colorterm in ["truecolor", "24bit"] and not self.text_only:
+            # Supports truecolor
+            return "truecolor"
+        else:
+            # ASCII blocks
+            return "ascii"
+        
+    def _get_size_mapping(self):
+        if self.terminal_type == "image":
+            # Sizes optimized for image display
+            return {'small': 10, 'medium': 40, 'large': 80}
+        else:
+            # Sizes optimized for ASCII block display
+            return {'small': 20, 'medium': 80, 'large': 160}
+
+    def get_display_size(self):
+        return self.size_mapping.get(self.size, 40)
 
     @staticmethod
     def convert_size(size_kb):
@@ -1453,7 +1476,7 @@ while True:
         model_id = main_cli.fetch_model_by_id()
         model = api_handler.get_model_by_id(model_id)
         if model:
-            model_display.display_model_card(model)
+            model_display.display_model_card(model, settings_cli.image_filter)
         else:
             print(f"Could not fetch model with ID: {model_id}")
     elif choice == 'Download model by ID':
