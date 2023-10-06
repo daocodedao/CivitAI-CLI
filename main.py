@@ -342,7 +342,7 @@ class MainCLI:
 
 class SettingsCLI:
     BASE_MODELS = ["SDXL 1.0", "SDXL 0.9", "SD 1.5", "SD 1.4", "SD 2.0", "SD 2.0 768", "SD 2.1", "SD 2.1 768", "Other"]
-    MODEL_TYPES = ["Checkpoint", "TextualInversion", "Hypernetwork", "AestheticGradient", "LORA", "Controlnet", "Poses"]
+    MODEL_TYPES = ["Checkpoint", "TextualInversion", "Hypernetwork", "AestheticGradient", "LORA", "LoCon", "Controlnet", "Poses", "Upscaler", "MotionModule", "VAE", "Poses", "Wildcards", "Workflows", "Other"]
     SORT_OPTIONS = ["Highest Rated", "Most Downloaded", "Newest"]
     PERIOD_OPTIONS = ["AllTime", "Year", "Month", "Week", "Day"]
     ALLOW_COMMERCIAL_USE = ["None", "Image", "Rent", "Sell"]    
@@ -616,7 +616,10 @@ class APIHandler:
         for key, value in query_dict.items():
             if isinstance(value, bool):
                 query_dict[key] = str(value).lower()
+            elif key == 'types' and isinstance(value, list):
+                query_dict[key] = ','.join(value)
         return query_dict
+
 
     def get_models(self):
         query = self.model_display.default_query if hasattr(self.model_display, 'default_query') else {}
@@ -1130,7 +1133,7 @@ class Downloader:
                 print(f"Failed to download image from {image_url}.")
 
         print(f"Successfully downloaded and saved metadata for {model_name}.")
-        
+
 class ModelDisplay:
     def __init__(self, size='medium', text_only=False):
         self.size = size  # 'small', 'medium', 'large'
