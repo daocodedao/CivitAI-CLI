@@ -161,3 +161,6 @@ Future updates aim to provide:
 - Fetching models by hash
 - Improved metadata management
 - Install script
+- check for updated versions
+- downloader should check if model already exists (if exists should be greyed out)
+
