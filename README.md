@@ -1,7 +1,5 @@
 ![Banner](banner.png)
 
-# CivitAI-CLI
-
 ## Introduction
 
 CivitAI-CLI is a command-line interface tool created to facilitate interactions with the [CivitAI API](https://civitai.com), providing a streamlined approach to fetch, display, list, and download models hosted on CivitAI. The application utilizes `viu` for image rendering, ensuring an enhanced user experience in terminals like iTerm2 and Kitty, with an alternative ANSI display for others. Although several features are accessible without an API key, obtaining one unlocks additional functionalities.
