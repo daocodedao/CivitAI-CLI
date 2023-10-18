@@ -37,7 +37,7 @@ class MainCLI:
 
     def main_menu(self):
         # Clear the terminal
-        os.system('cls' if os.name == 'nt' else 'clear')
+        #os.system('cls' if os.name == 'nt' else 'clear')
         questions = [
             List('choice',
                  message="What would you like to do?",
@@ -148,6 +148,7 @@ class MainCLI:
 
         if not silent:
             print("Finished scanning.")
+            os.system('cls' if os.name == 'nt' else 'clear')
         return new_files_found
 
     def download_in_background(self):
@@ -442,7 +443,18 @@ class MainCLI:
         ]
         return prompt(questions)['hash']
 
-    def scan_for_missing_data_menu(self):
+def scan_for_missing_data_menu(self):
+    # Load the existing index
+    model_hashes = self.load_model_index()
+
+    # Check if all indexed files have a model id
+    all_files_have_model_id = all(model.get('modelid') for model in model_hashes.values())
+
+    if all_files_have_model_id:
+        # If all indexed files have a model id, inform the user that all files are up-to-date
+        print("All files are up-to-date.")
+    else:
+        # If any indexed file does not have a model id, start the process of finding and creating new metadata
         # Create an interactive menu for folder selection
         choices = list(downloader.type_to_path.keys())
         filtered_choices = [choice for choice in choices if choice not in ["Workflows", "Other", "Poses", "MotionModule"]]
@@ -463,6 +475,9 @@ class MainCLI:
             # Get the actual folder path from type_to_path
             folder_choice = downloader.type_to_path.get(folder_choice)
             downloader.scan_and_update_metadata(folders=[folder_choice])
+
+        # After creating new metadata, update the index
+        self.scan_directory_for_models(self.downloader.default_download_dir, silent=True)
 
 
     def refresh_downloader_settings(self):
