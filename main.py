@@ -1645,7 +1645,31 @@ while True:
         model_id = main_cli.fetch_model_by_id()
         model = api_handler.get_model_by_id(model_id)
         if model:
-            model_display.display_model_card(model, settings_cli.image_filter)
+            # Calculate the download status
+            downloaded_versions = []  # List to store downloaded versions
+            model_versions = model.get('modelVersions', [])
+            for index_model in main_cli.model_index.values():
+                if index_model['modelid'] == model_id:
+                    for version in model_versions:
+                        if index_model['modelversionid'] == version.get('id'):
+                            # This is a downloaded version
+                            downloaded_versions.append(version.get('name'))
+            download_status = None
+            if downloaded_versions:
+                # If downloaded versions were found
+                if len(downloaded_versions) < len(model_versions):
+                    # If there are more versions available than downloaded
+                    if len(downloaded_versions) == 1:
+                        download_status = f"{Fore.YELLOW}⚠️ MORE VERSIONS AVAILABLE. Version '{', '.join(downloaded_versions)}' is downloaded.{Style.RESET_ALL}"
+                    else:
+                        download_status = f"{Fore.YELLOW}⚠️ MORE VERSIONS AVAILABLE. Versions '{', '.join(downloaded_versions)}' are downloaded.{Style.RESET_ALL}"
+                else:
+                    # If all versions are downloaded
+                    if len(downloaded_versions) == 1:
+                        download_status = f"{Fore.GREEN}✅ ALL VERSIONS DOWNLOADED. Version '{', '.join(downloaded_versions)}' is downloaded.{Style.RESET_ALL}"
+                    else:
+                        download_status = f"{Fore.GREEN}✅ ALL VERSIONS DOWNLOADED. Versions '{', '.join(downloaded_versions)}' are downloaded.{Style.RESET_ALL}"
+            model_display.display_model_card(model, settings_cli.image_filter, download_status)
         else:
             print(f"Could not fetch model with ID: {model_id}")
     elif choice == 'Download model by ID':
