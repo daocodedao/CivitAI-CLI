@@ -37,6 +37,8 @@ class MainCLI:
         #print("DEBUG: Entering main_menu")
         #print(f"DEBUG: MainCLI Initialized - image_filter: {self.settings_cli.image_filter}")
     def main_menu(self):
+        # Clear the terminal
+        os.system('cls' if os.name == 'nt' else 'clear')
         questions = [
             List('choice',
                  message="What would you like to do?",
@@ -64,7 +66,8 @@ class MainCLI:
 
     def scan_directory_for_models(self, directory):
         print("Scanning directory for downloaded models...")
-        model_hashes = self.load_model_index()  
+        model_hashes = self.load_model_index()  # Load the existing index
+        new_files_found = False
         directories_to_scan = [
             "models/Stable-diffusion",
             "embeddings",
@@ -90,9 +93,19 @@ class MainCLI:
                         if ext.lower() not in ['.ckpt', '.pt', '.safetensors']:
                             continue  # Skip this file if it doesn't have one of the desired extensions
                         model_id, _ = os.path.splitext(file)
+                        model_file_path = os.path.join(root, file)  # Define model_file_path here
+                        # Check if this model file is already in the index
+                        if any(model.get('filepath') == model_file_path and model.get('modelversionid') == model_id for model in model_hashes.values()):
+                            continue  # Skip this model if it's already in the index
                         info_file_path = os.path.join(root, f'{model_id}.civitai.info')
                         model_modelId = None  # Initialize model_modelId to None
                         model_name = None  # Initialize model_name to None
+                        model_hash = None  # Initialize model_hash to None
+
+                        # Use a combination of model_id and model_file_path as the key
+                        model_key = f"{model_id}_{model_file_path}"
+                        model_hashes[model_key] = {"modelname": model_name, "modelid": model_modelId, "modelversionid": model_id, "hash": model_hash, "filepath": model_file_path}
+
                         if os.path.exists(info_file_path):
                             # Read the hash from the civitai.info file
                             with open(info_file_path, 'r') as f:
@@ -107,14 +120,20 @@ class MainCLI:
                                 model_modelId = info.get('modelId')
                                 model_name = info.get('model', {}).get('name')
                                 print(f"Fetching hash from civitai.info for model {model_name}")
-                                model_hashes[model_id] = {"modelname": model_name, "modelid": model_modelId, "modelversionid": model_id, "hash": model_hash}
+                                model_hashes[model_key] = {"modelname": model_name, "modelid": model_modelId, "modelversionid": model_id, "hash": model_hash, "filepath": model_file_path}
                         else:
-                            # Generate the SHA256 hash
-                            with open(os.path.join(root, file), 'rb') as f:
-                                model_data = f.read()
-                                model_hash = hashlib.sha256(model_data).hexdigest()
+                            # Check if this model is already in the index
+                            for model in model_hashes.values():
+                                if model.get('filepath') == model_file_path:
+                                    # This model is already in the index, so we can skip it
+                                    break
+                            else:
+                                new_files_found = True
+                                with open(model_file_path, 'rb') as f:
+                                    model_data = f.read()
+                                    model_hash = hashlib.sha256(model_data).hexdigest()
                                 print(f"Generating hash for model {model_id}")
-                                model_hashes[model_id] = {"modelname": model_name, "modelid": model_modelId, "modelversionid": model_id, "hash": model_hash, "filepath": os.path.join(root, file)}
+                                model_hashes[model_key] = {"modelname": model_name, "modelid": model_modelId, "modelversionid": model_id, "hash": model_hash, "filepath": model_file_path}
         # Check for models that are no longer present and remove them from the index
         for model_id in list(model_hashes.keys()):  # We use list() to avoid modifying the dictionary while iterating
             model = model_hashes[model_id]
@@ -126,8 +145,8 @@ class MainCLI:
         with open('index.json', 'w') as f:
             json.dump(model_hashes, f, indent=4)
 
-        print("Finished scanning. Model index has been updated.")
-        return model_hashes
+        print("Finished scanning.")
+        return new_files_found
 
     def download_in_background(self):
         for model_id, version_id in self.selected_models_to_download:
@@ -172,37 +191,28 @@ class MainCLI:
                 for model in models:
                     model_id = model.get('id')
                     print(f"DEBUG: Checking model with ID: {model_id}")  # Debug statement
+                    downloaded_versions = []  # List to store downloaded versions
+                    model_versions = model.get('modelVersions', [])
                     for index_model in self.model_index.values():
                         if index_model['modelid'] == model_id:
-                            # Fetch the model versions
-                            model_versions = model.get('modelVersions', [])
-                            downloaded_version_name = None
                             for version in model_versions:
                                 if index_model['modelversionid'] == version.get('id'):
-                                    # This is the downloaded version
-                                    downloaded_version_name = version.get('name')
-                                    break
-                            if downloaded_version_name:
-                                # If a downloaded version was found
-                                if len(model_versions) > 1:
-                                    # If there are other versions available
-                                    download_status = f"{Fore.GREEN}✅ ALREADY DOWNLOADED. Version '{downloaded_version_name}' is downloaded. {Fore.YELLOW}⚠️ Other versions are available.{Style.RESET_ALL}"
-                                else:
-                                    # If no other versions are available
-                                    download_status = f"{Fore.GREEN}✅ ALREADY DOWNLOADED.{Style.RESET_ALL}"
-                            else:
-                                # If no downloaded version was found
-                                current_version = model_versions[0]  # Assuming the first version is the latest
-                                current_version_name = current_version.get('name')
-                                download_status = f"{Fore.RED}⚠️ NEW VERSION AVAILABLE. Latest version is '{current_version_name}'.{Style.RESET_ALL}"
-                            self.model_display.display_model_card(model, self.settings_cli.image_filter, download_status)
-                            break
-                    else:
-                        print(f"DEBUG: Model with ID: {model_id} not found in index")  # Debug statement
-                        self.model_display.display_model_card(model, self.settings_cli.image_filter)
-                    # Debug: Print image_filter value
-                    #print(f"DEBUG: Current image_filter = {self.settings_cli.image_filter}")
-
+                                    # This is a downloaded version
+                                    downloaded_versions.append(version.get('name'))
+                    download_status = None
+                    if downloaded_versions:
+                        # If downloaded versions were found
+                        if len(downloaded_versions) < len(model_versions):
+                            # If there are more versions available than downloaded
+                            download_status = f"{Fore.YELLOW}⚠️ MORE VERSIONS AVAILABLE. Versions '{', '.join(downloaded_versions)}' are downloaded.{Style.RESET_ALL}"
+                        else:
+                            # If all versions are downloaded
+                            download_status = f"{Fore.GREEN}✅ ALL VERSIONS DOWNLOADED. Versions '{', '.join(downloaded_versions)}' are downloaded.{Style.RESET_ALL}"
+                    self.model_display.display_model_card(model, self.settings_cli.image_filter, download_status)
+                else:
+                    print(f"DEBUG: Model with ID: {model_id} not found in index")  # Debug statement
+                    self.model_display.display_model_card(model, self.settings_cli.image_filter)
+ 
                 reload_page = False 
                 
 
@@ -1576,6 +1586,8 @@ api_handler = APIHandler()
 settings_cli = SettingsCLI(api_handler, model_display)
 downloader = Downloader(api_handler, settings_cli.root_directory)  
 main_cli = MainCLI(model_display, settings_cli, downloader)
+main_cli.scan_directory_for_models(settings_cli.root_directory)
+main_cli.load_model_index()
 
 # Main loop
 while True:
