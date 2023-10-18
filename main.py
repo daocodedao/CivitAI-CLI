@@ -25,6 +25,16 @@ from PIL import UnidentifiedImageError
 from subprocess import Popen, PIPE
 from colorama import Fore, Style
 
+import signal
+import sys
+
+def signal_handler(sig, frame):
+    print('Ctrl+C shutting down now.')
+    os.system('cls' if os.name == 'nt' else 'clear')
+    sys.exit(0)
+
+
+signal.signal(signal.SIGINT, signal_handler)
 
 class MainCLI:
     def __init__(self, model_display, settings_cli, downloader):

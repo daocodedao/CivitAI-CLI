@@ -152,6 +152,7 @@ CivitAI-CLI presently allows users to:
 - Adjust image sizes
 - Set a content filter for images (options: block, blur, or show)
 - Resume interrupted downloads (partially implemented)
+- check for updated versions
 
 ### To-Do
 Future updates aim to provide:
@@ -159,6 +160,6 @@ Future updates aim to provide:
 - Fetching models by hash
 - Improved metadata management
 - Install script
-- check for updated versions
-- downloader should check if model already exists (if exists should be greyed out)
+
+
 
