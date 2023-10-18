@@ -34,8 +34,7 @@ class MainCLI:
         self.selected_models_to_download = []
         self.BASE_MODELS = ["SDXL 1.0", "SDXL 0.9", "SD 1.5","SD 1.4", "SD 2.0", "SD 2.0 768", "SD 2.1", "SD 2.1 768", "Other"]
         self.load_model_index()
-        #print("DEBUG: Entering main_menu")
-        #print(f"DEBUG: MainCLI Initialized - image_filter: {self.settings_cli.image_filter}")
+
     def main_menu(self):
         # Clear the terminal
         os.system('cls' if os.name == 'nt' else 'clear')
@@ -64,8 +63,9 @@ class MainCLI:
             self.model_index = {}
         return self.model_index  # Ensure that a dictionary is always returned 
 
-    def scan_directory_for_models(self, directory):
-        print("Scanning directory for downloaded models...")
+    def scan_directory_for_models(self, directory, silent=False):
+        if not silent:
+            print("Scanning directory for downloaded models...")
         model_hashes = self.load_model_index()  # Load the existing index
         new_files_found = False
         directories_to_scan = [
@@ -86,7 +86,6 @@ class MainCLI:
         for dir_to_scan in directories_to_scan:
             full_dir_path = os.path.join(directory, dir_to_scan)
             if os.path.exists(full_dir_path):
-                print(f"Scanning directory: {full_dir_path}")
                 for root, dirs, files in os.walk(full_dir_path):
                     for file in files:
                         _, ext = os.path.splitext(file)
@@ -119,7 +118,8 @@ class MainCLI:
                                 model_id = info.get('id')
                                 model_modelId = info.get('modelId')
                                 model_name = info.get('model', {}).get('name')
-                                print(f"Fetching hash from civitai.info for model {model_name}")
+                                if not silent:
+                                    print(f"Fetching hash from civitai.info for model {model_name}")
                                 model_hashes[model_key] = {"modelname": model_name, "modelid": model_modelId, "modelversionid": model_id, "hash": model_hash, "filepath": model_file_path}
                         else:
                             # Check if this model is already in the index
@@ -132,20 +132,22 @@ class MainCLI:
                                 with open(model_file_path, 'rb') as f:
                                     model_data = f.read()
                                     model_hash = hashlib.sha256(model_data).hexdigest()
-                                print(f"Generating hash for model {model_id}")
+                                if not silent:
+                                    print(f"Generating hash for model {model_id}")
                                 model_hashes[model_key] = {"modelname": model_name, "modelid": model_modelId, "modelversionid": model_id, "hash": model_hash, "filepath": model_file_path}
-        # Check for models that are no longer present and remove them from the index
-        for model_id in list(model_hashes.keys()):  # We use list() to avoid modifying the dictionary while iterating
-            model = model_hashes[model_id]
-            model_file_path = model.get('filepath')
-            if model_file_path and not os.path.exists(model_file_path):
-                del model_hashes[model_id]  # Remove this model from the index
+            # Check for models that are no longer present and remove them from the index
+            for model_id in list(model_hashes.keys()):  # We use list() to avoid modifying the dictionary while iterating
+                model = model_hashes[model_id]
+                model_file_path = model.get('filepath')
+                if model_file_path and not os.path.exists(model_file_path):
+                    del model_hashes[model_id]  # Remove this model from the index
 
         # Write the updated model_hashes dictionary to index.json
         with open('index.json', 'w') as f:
             json.dump(model_hashes, f, indent=4)
 
-        print("Finished scanning.")
+        if not silent:
+            print("Finished scanning.")
         return new_files_found
 
     def download_in_background(self):
@@ -171,11 +173,8 @@ class MainCLI:
         current_page = 1
         reload_page = True 
         temporary_query = None
-
+        #os.system('cls' if os.name == 'nt' else 'clear')
         while True:
-            #print(f"Debug: Current temporary_query = {temporary_query}")  # Debug statement
-            #print(f"Debug: Current default_query = {self.model_display.default_query}")  # Debug statement
-            #print(f"DEBUG: list_models_menu - image_filter: {self.settings_cli.image_filter}")
             if reload_page:
                 if temporary_query:
                     query = {**temporary_query, 'page': current_page}
@@ -204,16 +203,18 @@ class MainCLI:
                         # If downloaded versions were found
                         if len(downloaded_versions) < len(model_versions):
                             # If there are more versions available than downloaded
-                            download_status = f"{Fore.YELLOW}⚠️ MORE VERSIONS AVAILABLE. Versions '{', '.join(downloaded_versions)}' are downloaded.{Style.RESET_ALL}"
+                            if len(downloaded_versions) == 1:
+                                download_status = f"{Fore.YELLOW}⚠️ MORE VERSIONS AVAILABLE. Version '{', '.join(downloaded_versions)}' is downloaded.{Style.RESET_ALL}"
+                            else:
+                                download_status = f"{Fore.YELLOW}⚠️ MORE VERSIONS AVAILABLE. Versions '{', '.join(downloaded_versions)}' are downloaded.{Style.RESET_ALL}"
                         else:
                             # If all versions are downloaded
-                            download_status = f"{Fore.GREEN}✅ ALL VERSIONS DOWNLOADED. Versions '{', '.join(downloaded_versions)}' are downloaded.{Style.RESET_ALL}"
+                            if len(downloaded_versions) == 1:
+                                download_status = f"{Fore.GREEN}✅ ALL VERSIONS DOWNLOADED. Version '{', '.join(downloaded_versions)}' is downloaded.{Style.RESET_ALL}"
+                            else:
+                                download_status = f"{Fore.GREEN}✅ ALL VERSIONS DOWNLOADED. Versions '{', '.join(downloaded_versions)}' are downloaded.{Style.RESET_ALL}"
                     self.model_display.display_model_card(model, self.settings_cli.image_filter, download_status)
-                else:
-                    print(f"DEBUG: Model with ID: {model_id} not found in index")  # Debug statement
-                    self.model_display.display_model_card(model, self.settings_cli.image_filter)
- 
-                reload_page = False 
+                reload_page = False
                 
 
             pagination_choices = ['Next page', 'Previous page', 'Jump to page'] if total_pages > 1 else []
@@ -308,37 +309,50 @@ class MainCLI:
                     (model.get('name', 'Unknown'), model.get('id', None))
                     for model in models
                 ]
-
+                choices.append(('Back', None))  # Add 'Back' option
                 download_question = [
                     Checkbox('selected_models',
-                             message='Which models would you like to download?',
-                             choices=choices)
+                            message='Which models would you like to download?',
+                            choices=choices)
                 ]
-
                 download_answer = prompt(download_question)
                 selected_model_ids = download_answer.get('selected_models', [])
-
+                if 'Back' in selected_model_ids:
+                    continue  # Continue to the next iteration of the outer loop if 'Back' is selected
                 if selected_model_ids:
                     for model_id in selected_model_ids:
                         model = self.settings_cli.api_handler.get_model_by_id(model_id)
                         model_versions = model.get('modelVersions', [])
                         
-                        if len(model_versions) == 1:
-                            single_version = model_versions[0]
-                            selected_version_id = single_version.get('id', None)
-                            if selected_version_id:
-                                self.selected_models_to_download.append((model_id, selected_version_id))
-                                
-                        elif len(model_versions) > 1:
-                            version_choices = [(ver.get('name', 'Unknown'), ver.get('id', None)) for ver in model_versions]
+                        # Fetch downloaded versions for the current model
+                        downloaded_versions = []  # List to store downloaded versions
+                        for index_model in self.model_index.values():
+                            if index_model['modelid'] == model_id:
+                                for version in model_versions:
+                                    if index_model['modelversionid'] == version.get('id'):
+                                        # This is a downloaded version
+                                        downloaded_versions.append(version.get('name'))
+
+                        if len(model_versions) > 0:
+                            version_choices = []
+                            for ver in model_versions:
+                                version_name = ver.get('name', 'Unknown')
+                                version_id = ver.get('id', None)
+                                # Check if this version is already downloaded
+                                if version_name in downloaded_versions:
+                                    version_name += " (downloaded)"
+                                version_choices.append((version_name, version_id))
+                            version_choices.append(('Back', None))  # Add 'Back' option
                             version_question = [
                                 Checkbox('selected_versions',
-                                         message=f'Select versions for {model.get("name", "Unknown")}',
-                                         choices=version_choices)
+                                        message=f'Select versions for {model.get("name", "Unknown")}',
+                                        choices=version_choices)
                             ]
                             version_answer = prompt(version_question)
                             selected_version_ids = version_answer.get('selected_versions', [])
                             if selected_version_ids:
+                                if 'Back' in selected_version_ids:
+                                    break  # Break out of the loop if 'Back' is selected
                                 for version_id in selected_version_ids:
                                     self.selected_models_to_download.append((model_id, version_id))
                         else:
@@ -849,8 +863,11 @@ class APIHandler:
         return response.json() if response.status_code == 200 else None  
 
 class Downloader:
-    def __init__(self, api_handler, root_directory=None):
+    def __init__(self, api_handler, settings_cli, main_cli, root_directory=None):
+        self.settings_cli = settings_cli
+        self.main_cli = main_cli
         self.api_handler = api_handler
+        self.root_directory = root_directory
         self.failed_downloads_list = []
         self.type_to_path = {
             "Checkpoint": "models/Stable-diffusion",
@@ -1054,6 +1071,8 @@ class Downloader:
                     # Move the file to the final destination
                     try:
                         shutil.move(downloaded_file_path, os.path.join(final_download_path, downloaded_file_name))
+                        self.main_cli.scan_directory_for_models(self.settings_cli.root_directory, silent=True)
+                        print("updated index")
                     except (FileNotFoundError, PermissionError) as e:
                         print(f"Error in moving the file: {e}")
 
@@ -1580,14 +1599,16 @@ class ModelDisplay:
         print(f"Hash: {model_by_hash['hash']}")
         # ... more fields
 
+
 # Initialize classes
 model_display = ModelDisplay()  
 api_handler = APIHandler()
 settings_cli = SettingsCLI(api_handler, model_display)
-downloader = Downloader(api_handler, settings_cli.root_directory)  
-main_cli = MainCLI(model_display, settings_cli, downloader)
+downloader = Downloader(api_handler, settings_cli, None, settings_cli.root_directory)  # Temporarily pass None for main_cli
+main_cli = MainCLI(model_display, settings_cli, downloader)  # Now that we have a downloader, we can create main_cli
 main_cli.scan_directory_for_models(settings_cli.root_directory)
 main_cli.load_model_index()
+downloader.main_cli = main_cli  # Now that we have main_cli, we can set it in downloader
 
 # Main loop
 while True:
