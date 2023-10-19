@@ -224,7 +224,7 @@ class MainCLI:
                                 download_status = f"{Fore.GREEN}✅ ALL VERSIONS DOWNLOADED. Version '{', '.join(downloaded_versions)}' is downloaded.{Style.RESET_ALL}"
                             else:
                                 download_status = f"{Fore.GREEN}✅ ALL VERSIONS DOWNLOADED. Versions '{', '.join(downloaded_versions)}' are downloaded.{Style.RESET_ALL}"
-                    self.model_display.display_model_card(model, self.settings_cli.image_filter, download_status)
+                    self.model_display.display_model_card(model, self.settings_cli.image_filter, download_status, self.settings_cli.image_filter_settings)
                 reload_page = False
                 
 
@@ -506,7 +506,7 @@ class SettingsCLI:
         self.model_version_preference = 'primary'  # Initialize here
         self.load_settings()
         self.load_query_settings()
-        #self.image_filter = 'none' 
+        self.image_filter_settings = {'nsfw_status': 'allow'} 
 
     def load_query_settings(self):
         try:
@@ -778,33 +778,35 @@ class APIHandler:
 
     def get_models(self):
         query = self.model_display.default_query if hasattr(self.model_display, 'default_query') else {}
-        #print("Debug: Final query to API: ", query)
         endpoint = f"{self.BASE_URL}models"
-        #print(f"DEBUG: Calling API URL {endpoint}")  # Debug print
-
+        
         max_retries = 10  # Maximum number of retries
         retry_count = 0  # Initialize retry count
 
         while retry_count < max_retries:
             response = requests.get(endpoint)
-
-            if response.status_code == 200:
-                #print("DEBUG: Successful API call to get_models.")
-                return response.json()
+            #print("Status Code:", response.status_code)
+            #print("Raw Response:", response.text)
             
+            if response.status_code == 200:
+                try:
+                    return response.json()  # Attempt to parse the JSON
+                except json.JSONDecodeError:  # Catch the JSON decoding error
+                    print("CivitAI has trouble at the moment")
+                    return None, {'error': 'Invalid JSON response'}
+                
             elif 400 <= response.status_code < 500:
                 return None, {'error': f"Client error: {response.content.decode('utf-8')}"}
-            
+                
             elif 500 <= response.status_code < 600:
                 print(f"Server error occurred. Retrying... {retry_count + 1}/{max_retries}")
                 retry_count += 1
                 time.sleep(2)  # Wait for 2 seconds before retrying
-
+                
             else:
                 return None, {'error': f"An unknown error occurred. Status Code: {response.status_code}"}
 
         return None, {'error': 'Max retries reached. Please try again later.'}
-
 
     def post_process_filter(self, api_results, base_model=None, nsfw_only=False):
         # Initialize an empty list to store the filtered results
@@ -850,6 +852,7 @@ class APIHandler:
 
         while retry_count < max_retries:
             response = requests.get(endpoint, params=query_dict, headers=headers)
+            print("Status Code:", response.status_code)
 
             if response.status_code == 200:
                 #print("DEBUG: Successful API call to get_models_with_default_query.")
@@ -875,16 +878,19 @@ class APIHandler:
     def get_model_by_id(self, model_id):
         endpoint = f"{self.BASE_URL}models/{model_id}"
         response = requests.get(endpoint)
+        print("Status Code:", response.status_code)
         return response.json() if response.status_code == 200 else None
 
     def get_model_version_by_id(self, version_id):
         endpoint = f"{self.BASE_URL}model-versions/{version_id}"
         response = requests.get(endpoint)
+        print("Status Code:", response.status_code)
         return response.json() if response.status_code == 200 else None
 
     def get_model_by_hash(self, hash_value):
         endpoint = f"{self.BASE_URL}model-versions/by-hash/{hash_value}"
         response = requests.get(endpoint)
+        print("Status Code:", response.status_code)
         return response.json() if response.status_code == 200 else None  
 
 class Downloader:
@@ -1345,7 +1351,9 @@ class ModelDisplay:
         else:
             return '\033[91m'  # Light Red
 
-    def display_model_card(self, model, image_filter, download_status=None):
+    def display_model_card(self, model, image_filter, download_status, image_filter_settings):
+        nsfw_status = None
+        action = image_filter_settings.get(nsfw_status, 'allow')
         model_name = model.get('name', 'N/A')
         total_length = 125  
         padding_length = (total_length - len(model_name)) // 2  
@@ -1422,12 +1430,13 @@ class ModelDisplay:
         if not self.text_only:
             nsfw_warning_displayed = False  
 
+            nsfw_status = 'None'  # Initialize to a default value
+
             for model_version in model.get('modelVersions', []):
                 for image in model_version.get('images', []):
-                    image_url = image.get('url', 'N/A')
                     nsfw_status = image.get('nsfw', 'None')  # Get NSFW status of the image
-                    
-                    action = image_filter_settings.get(nsfw_status, 'allow')
+
+                    action = image_filter_settings.get(nsfw_status, 'allow') 
                     
                     if action == 'block':
                         if not nsfw_warning_displayed:
@@ -1437,7 +1446,7 @@ class ModelDisplay:
 
                     elif action == 'blockify':
                         print(f"⚠️ {nsfw_status} content is blockified")
-                    
+                 
                     # Image fetching and displaying logic
                     if image_url != 'N/A':
                         try:
