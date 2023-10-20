@@ -400,7 +400,7 @@ class MainCLI:
                         # Use your actual method to fetch more info here.
                         model_version = self.settings_cli.api_handler.get_model_by_id(model_id)
                         if model_version:
-                            self.model_display.display_model_version_details(model, self.settings_cli.image_filter)
+                            self.model_display.display_model_version_details(model_version, self.settings_cli.image_filter)
                         else:
                             print(f"No detailed information available for model ID: {model_id}")
                 else:
