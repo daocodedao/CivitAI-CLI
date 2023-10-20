@@ -73,9 +73,8 @@ class MainCLI:
             self.model_index = {}
         return self.model_index  # Ensure that a dictionary is always returned 
 
-    def scan_directory_for_models(self, directory, silent=False):
-        if not silent:
-            print("Scanning directory for downloaded models...")
+    def scan_directory_for_models(self, directory):
+        print("Scanning directory for downloaded models...")
         model_hashes = self.load_model_index()  # Load the existing index
         new_files_found = False
         directories_to_scan = [
@@ -103,20 +102,15 @@ class MainCLI:
                             continue  # Skip this file if it doesn't have one of the desired extensions
                         model_id, _ = os.path.splitext(file)
                         model_file_path = os.path.join(root, file)  # Define model_file_path here
-                        # Check if this model file is already in the index
                         if any(model.get('filepath') == model_file_path and model.get('modelversionid') == model_id for model in model_hashes.values()):
                             continue  # Skip this model if it's already in the index
                         info_file_path = os.path.join(root, f'{model_id}.civitai.info')
                         model_modelId = None  # Initialize model_modelId to None
                         model_name = None  # Initialize model_name to None
                         model_hash = None  # Initialize model_hash to None
-
-                        # Use a combination of model_id and model_file_path as the key
                         model_key = f"{model_id}_{model_file_path}"
                         model_hashes[model_key] = {"modelname": model_name, "modelid": model_modelId, "modelversionid": model_id, "hash": model_hash, "filepath": model_file_path}
-
                         if os.path.exists(info_file_path):
-                            # Read the hash from the civitai.info file
                             with open(info_file_path, 'r') as f:
                                 info = json.load(f)
                                 files = info.get('files', [])
@@ -128,38 +122,30 @@ class MainCLI:
                                 model_id = info.get('id')
                                 model_modelId = info.get('modelId')
                                 model_name = info.get('model', {}).get('name')
-                                if not silent:
-                                    print(f"Fetching hash from civitai.info for model {model_name}")
+                                print(f"Fetching hash from civitai.info for model {model_name}")
                                 model_hashes[model_key] = {"modelname": model_name, "modelid": model_modelId, "modelversionid": model_id, "hash": model_hash, "filepath": model_file_path}
                         else:
-                            # Check if this model is already in the index
                             for model in model_hashes.values():
                                 if model.get('filepath') == model_file_path:
-                                    # This model is already in the index, so we can skip it
                                     break
                             else:
                                 new_files_found = True
                                 with open(model_file_path, 'rb') as f:
                                     model_data = f.read()
                                     model_hash = hashlib.sha256(model_data).hexdigest()
-                                if not silent:
-                                    print(f"Generating hash for model {model_id}")
+                                print(f"Generating hash for model {model_id}")
                                 model_hashes[model_key] = {"modelname": model_name, "modelid": model_modelId, "modelversionid": model_id, "hash": model_hash, "filepath": model_file_path}
-            # Check for models that are no longer present and remove them from the index
-            for model_id in list(model_hashes.keys()):  # We use list() to avoid modifying the dictionary while iterating
-                model = model_hashes[model_id]
-                model_file_path = model.get('filepath')
-                if model_file_path and not os.path.exists(model_file_path):
-                    del model_hashes[model_id]  # Remove this model from the index
-
-        # Write the updated model_hashes dictionary to index.json
+                for model_id in list(model_hashes.keys()):  # We use list() to avoid modifying the dictionary while iterating
+                    model = model_hashes[model_id]
+                    model_file_path = model.get('filepath')
+                    if model_file_path and not os.path.exists(model_file_path):
+                        del model_hashes[model_id]
         with open('index.json', 'w') as f:
             json.dump(model_hashes, f, indent=4)
-
-        if not silent:
-            print("Finished scanning.")
-            os.system('cls' if os.name == 'nt' else 'clear')
+        print("Finished scanning.")
+        os.system('cls' if os.name == 'nt' else 'clear')
         return new_files_found
+
 
     def download_in_background(self):
         for model_id, version_id in self.selected_models_to_download:
@@ -200,7 +186,7 @@ class MainCLI:
                 # Display the fetched models
                 for model in models:
                     model_id = model.get('id')
-                    print(f"DEBUG: Checking model with ID: {model_id}")  # Debug statement
+                    #print(f"DEBUG: Checking model with ID: {model_id}")  # Debug statement
                     downloaded_versions = []  # List to store downloaded versions
                     model_versions = model.get('modelVersions', [])
                     for index_model in self.model_index.values():
@@ -453,41 +439,41 @@ class MainCLI:
         ]
         return prompt(questions)['hash']
 
-def scan_for_missing_data_menu(self):
-    # Load the existing index
-    model_hashes = self.load_model_index()
+    def scan_for_missing_data_menu(self):
+        # Load the existing index
+        model_hashes = self.load_model_index()
 
-    # Check if all indexed files have a model id
-    all_files_have_model_id = all(model.get('modelid') for model in model_hashes.values())
+        # Check if all indexed files have a model id
+        all_files_have_model_id = all(model.get('modelid') for model in model_hashes.values())
 
-    if all_files_have_model_id:
-        # If all indexed files have a model id, inform the user that all files are up-to-date
-        print("All files are up-to-date.")
-    else:
-        # If any indexed file does not have a model id, start the process of finding and creating new metadata
-        # Create an interactive menu for folder selection
-        choices = list(downloader.type_to_path.keys())
-        filtered_choices = [choice for choice in choices if choice not in ["Workflows", "Other", "Poses", "MotionModule"]]
-        sorted_choices = ['All'] + sorted(filtered_choices)
-
-        questions = [
-            List('folder_choice',
-                 message="Select folders to scan for missing data:",
-                 choices=sorted_choices,
-                 )
-        ]
-        folder_choice = prompt(questions)['folder_choice']
-
-        # Translate 'All' to None, to scan all folders
-        if folder_choice == 'All':
-            downloader.scan_and_update_metadata()  # Pass None implicitly
+        if all_files_have_model_id:
+            # If all indexed files have a model id, inform the user that all files are up-to-date
+            print("All files are up-to-date.")
         else:
-            # Get the actual folder path from type_to_path
-            folder_choice = downloader.type_to_path.get(folder_choice)
-            downloader.scan_and_update_metadata(folders=[folder_choice])
+            # If any indexed file does not have a model id, start the process of finding and creating new metadata
+            # Create an interactive menu for folder selection
+            choices = list(downloader.type_to_path.keys())
+            filtered_choices = [choice for choice in choices if choice not in ["Workflows", "Other", "Poses", "MotionModule"]]
+            sorted_choices = ['All'] + sorted(filtered_choices)
 
-        # After creating new metadata, update the index
-        self.scan_directory_for_models(self.downloader.default_download_dir, silent=True)
+            questions = [
+                List('folder_choice',
+                     message="Select folders to scan for missing data:",
+                     choices=sorted_choices,
+                     )
+            ]
+            folder_choice = prompt(questions)['folder_choice']
+
+            # Translate 'All' to None, to scan all folders
+            if folder_choice == 'All':
+                downloader.scan_and_update_metadata()  # Pass None implicitly
+            else:
+                # Get the actual folder path from type_to_path
+                folder_choice = downloader.type_to_path.get(folder_choice)
+                downloader.scan_and_update_metadata(folders=[folder_choice])
+
+            # After creating new metadata, update the index
+            self.scan_directory_for_models(self.downloader.default_download_dir)
 
 
     def refresh_downloader_settings(self):
@@ -537,7 +523,7 @@ class SettingsCLI:
             if not self.validate_image_filter(self.image_filter):
                 print("Warning: Invalid image filter settings found. Using default settings.")
                 self.image_filter = {'Soft': 'blockify', 'Mature': 'block', 'X': 'block'}
-            print(f"DEBUG: Loaded image_filter = {self.image_filter}")  # Debug print
+            #print(f"DEBUG: Loaded image_filter = {self.image_filter}")  # Debug print
             self.root_directory = settings.get('root_directory', os.path.join(os.path.expanduser("~"), 'Downloads'))
         except FileNotFoundError:
             print("Settings file not found. Using default settings.")
@@ -784,7 +770,7 @@ class APIHandler:
         retry_count = 0  # Initialize retry count
 
         while retry_count < max_retries:
-            response = requests.get(endpoint)
+            response = requests.get(endpoint, allow_redirects=False)
             #print("Status Code:", response.status_code)
             #print("Raw Response:", response.text)
             
@@ -851,8 +837,8 @@ class APIHandler:
         retry_count = 0  # Initialize retry count
 
         while retry_count < max_retries:
-            response = requests.get(endpoint, params=query_dict, headers=headers)
-            print("Status Code:", response.status_code)
+            response = requests.get(endpoint, params=query_dict, headers=headers, allow_redirects=False)
+            #print("Status Code:", response.status_code)
 
             if response.status_code == 200:
                 #print("DEBUG: Successful API call to get_models_with_default_query.")
@@ -877,20 +863,20 @@ class APIHandler:
 
     def get_model_by_id(self, model_id):
         endpoint = f"{self.BASE_URL}models/{model_id}"
-        response = requests.get(endpoint)
-        print("Status Code:", response.status_code)
+        response = requests.get(endpoint, allow_redirects=False)
+        #print("Status Code:", response.status_code)
         return response.json() if response.status_code == 200 else None
 
     def get_model_version_by_id(self, version_id):
         endpoint = f"{self.BASE_URL}model-versions/{version_id}"
-        response = requests.get(endpoint)
-        print("Status Code:", response.status_code)
+        response = requests.get(endpoint, allow_redirects=False)
+        #print("Status Code:", response.status_code)
         return response.json() if response.status_code == 200 else None
 
     def get_model_by_hash(self, hash_value):
         endpoint = f"{self.BASE_URL}model-versions/by-hash/{hash_value}"
-        response = requests.get(endpoint)
-        print("Status Code:", response.status_code)
+        response = requests.get(endpoint, allow_redirects=False)
+        #print("Status Code:", response.status_code)
         return response.json() if response.status_code == 200 else None  
 
 class Downloader:
@@ -919,7 +905,6 @@ class Downloader:
 
         self.MAX_RETRIES = 3  # Maximum number of retries
         self.RETRY_DELAY = 5  # Delay in seconds between retries        
-        # Default download directory if not specified in settings
         self.default_download_dir = root_directory or os.path.join(os.path.expanduser("~"), 'Downloads')
         print(colored(f"🚀 Downloader initialized with root directory {self.default_download_dir}", "green"))
 
@@ -1039,8 +1024,6 @@ class Downloader:
         else:
             print("No versions available for this model.")
 
-
-
     @staticmethod
     def spinning_cursor():
         global spin
@@ -1065,7 +1048,10 @@ class Downloader:
                 
                 if silent:
                     process = Popen(aria2_command, stdout=PIPE, stderr=PIPE)
+                    process = Popen(aria2_command, stdout=PIPE, stderr=PIPE)
                     stdout, stderr = process.communicate()
+                    print(f"stdout: {stdout.decode('utf-8')}")
+                    print(f"stderr: {stderr.decode('utf-8')}")
                 else:
                     # Start the spinner in a separate thread
                     spin = True
@@ -1102,7 +1088,7 @@ class Downloader:
                     # Move the file to the final destination
                     try:
                         shutil.move(downloaded_file_path, os.path.join(final_download_path, downloaded_file_name))
-                        self.main_cli.scan_directory_for_models(self.settings_cli.root_directory, silent=True)
+                        self.main_cli.scan_directory_for_models(self.settings_cli.root_directory)
                         print("updated index")
                     except (FileNotFoundError, PermissionError) as e:
                         print(f"Error in moving the file: {e}")
@@ -1291,7 +1277,7 @@ class Downloader:
         image_url = model_version_details["images"][0].get("url", None) if model_version_details.get("images") else None
         if image_url:
             preview_file_path = os.path.join(download_folder, f"{model_name}.preview.png")
-            response = requests.get(image_url)
+            response = requests.get(image_url, allow_redirects=False)
             if response.status_code == 200:
                 with open(preview_file_path, 'wb') as f:
                     f.write(response.content)
@@ -1678,7 +1664,7 @@ while True:
                         download_status = f"{Fore.GREEN}✅ ALL VERSIONS DOWNLOADED. Version '{', '.join(downloaded_versions)}' is downloaded.{Style.RESET_ALL}"
                     else:
                         download_status = f"{Fore.GREEN}✅ ALL VERSIONS DOWNLOADED. Versions '{', '.join(downloaded_versions)}' are downloaded.{Style.RESET_ALL}"
-            model_display.display_model_card(model, settings_cli.image_filter, download_status)
+            model_display.display_model_card(model, settings_cli.image_filter, download_status, image_filter_settings={})
         else:
             print(f"Could not fetch model with ID: {model_id}")
     elif choice == 'Download model by ID':
