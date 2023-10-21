@@ -293,7 +293,7 @@ class MainCLI:
                 # Display the fetched models
                 for model in models: 
                     # Access image_filter from settings_cli and pass it to display_model_card
-                    self.model_display.display_model_card(model, self.settings_cli.image_filter)
+                    self.model_display.display_model_card(model, self.settings_cli.image_filter, download_status, self.settings_cli.image_filter_settings)
                     # Debug: Print image_filter value
                     #print(f"DEBUG: Current image_filter = {self.settings_cli.image_filter}")
 
