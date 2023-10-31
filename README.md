@@ -149,6 +149,7 @@ Explore the various functionalities provided by CivitAI-CLI:
 ```
 
 **Model Display Example**
+
 Displayed using text mode:
 ```
 🆔 ID: 157458
