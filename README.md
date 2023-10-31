@@ -2,7 +2,27 @@
 
 ## Introduction
 
-CivitAI-CLI is a command-line interface tool created to facilitate interactions with the [CivitAI API](https://civitai.com), providing a streamlined approach to fetch, display, list, and download models hosted on CivitAI. The application utilizes `viu` for image rendering, ensuring an enhanced user experience in terminals like iTerm2 and Kitty, with an alternative ANSI display for others. Although several features are accessible without an API key, obtaining one unlocks additional functionalities.
+**CivitAI-CLI: Streamlined Access to CivitAI Models**
+
+The CivitAI-CLI is a command-line interface tool crafted to enhance user interactions with the [CivitAI API](https://civitai.com). Its primary goal is to simplify the processes of listing, displaying, fetching, and downloading models available on CivitAI.
+
+**Key Features of CivitAI-CLI:**
+
+- **Efficient Interactions**: CivitAI-CLI provides a user-friendly approach, eliminating the complexities of manual API endpoint handling. Easily fetch, list, and download models straight from your terminal.
+
+- **Optimized Visual Experience with `viu`**: The tool leverages `viu` for image rendering, offering improved visual feedback in terminals such as iTerm2 and Kitty. For those on alternative terminals, an ANSI display is available to ensure consistent user experience.
+
+- **Enhanced Functionality with an API Key**: While CivitAI-CLI is versatile without an API key, possessing one grants access to an extended array of features.
+
+**The Genesis of CivitAI-CLI:**
+
+Developed out of a specific need to download models on remote servers via SSH, especially for servers running stable diffusion systems, the CivitAI-CLI addresses this niche requirement, ensuring efficient access to CivitAI's models regardless of the user's location.
+
+---
+
+CivitAI may house a myriad of models, ranging from the academically serious to the more leisurely. However, the CivitAI-CLI aims to be a tool of choice for anyone seeking a streamlined interface to this platform. 
+
+
 
 ## Table of Contents
 
@@ -178,5 +198,3 @@ Future updates aim to provide:
 - Enhanced model cards for details
 - Fetching models by hash
 - Improved metadata management
-  
-  
