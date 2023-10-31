@@ -62,18 +62,18 @@ To create and activate a virtual environment:
 #### For Windows
 
 ```bash
-python -m venv venv
-.\venv\Scripts\activate
+python -m venv myenv
+.\myenv\Scripts\activate
 ```
 
 #### For MacOS/Linux
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate
+python3 -m venv myenv
+source myenv/bin/activate
 ```
 
-**Note:** Ensure your shell is in the directory where `venv` is created. Also windows support is not tested yet and will likely break.
+**Note:** Ensure your shell is in the directory where `myenv` is created. Also windows support is not tested yet and will likely break.
 
 ### Install Dependencies
 
