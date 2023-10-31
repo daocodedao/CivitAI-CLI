@@ -20,24 +20,37 @@ CivitAI-CLI is a command-line interface tool created to facilitate interactions 
 To utilize CivitAI-CLI and ensure a clean environment without dependency conflicts, it's recommended to install it within a Python virtual environment (venv). Here are the steps to clone the repository, set up a venv, and install the necessary dependencies:
 
 ### Prerequisites
+
 Ensure you have Python 3.6 or later and `pip` installed on your system. If not, download and install Python from [the official website](https://www.python.org/) and `pip` will be included.
 
 ### Clone the Repository
+
+To quickly set up, you can use the following one-liner:
+
+```bash
+git clone https://github.com/roadmaus/CivitAI-CLI.git && cd CivitAI-CLI && git checkout dev && [[ -x start.sh ]] || chmod +x start.sh && ./start.sh
+```
+
+Or you can manually clone it:
+
 ```bash
 git clone https://github.com/roadmaus/CivitAI-CLI.git
 cd CivitAI-CLI
 ```
 
 ### Setup Virtual Environment (venv)
+
 To create and activate a virtual environment:
 
 #### For Windows
+
 ```bash
 python -m venv venv
 .\venv\Scripts\activate
 ```
 
 #### For MacOS/Linux
+
 ```bash
 python3 -m venv venv
 source venv/bin/activate
@@ -46,6 +59,7 @@ source venv/bin/activate
 **Note:** Ensure your shell is in the directory where `venv` is created. Also windows support is not tested yet and will likely break.
 
 ### Install Dependencies
+
 With the virtual environment activated, install the dependencies:
 
 ```bash
@@ -53,6 +67,7 @@ pip install -r requirements.txt
 ```
 
 **To deactivate the virtual environment when you're done:**
+
 ```bash
 deactivate
 ```
@@ -143,6 +158,7 @@ Models are displayed in the following format:
 ## Current State and Functionalities
 
 CivitAI-CLI presently allows users to:
+
 - List and filter models
 - Download models
 - Fetch model info
@@ -155,11 +171,10 @@ CivitAI-CLI presently allows users to:
 - check for updated versions
 
 ### To-Do
+
 Future updates aim to provide:
+
 - Enhanced model cards for details
 - Fetching models by hash
 - Improved metadata management
 - Install script
-
-
-
