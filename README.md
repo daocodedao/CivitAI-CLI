@@ -169,6 +169,7 @@ CivitAI-CLI presently allows users to:
 - Set a content filter for images (options: block, blur, or show)
 - Resume interrupted downloads (partially implemented)
 - check for updated versions
+- install and run it using the one-liner (or install script)
 
 ### To-Do
 
@@ -177,4 +178,5 @@ Future updates aim to provide:
 - Enhanced model cards for details
 - Fetching models by hash
 - Improved metadata management
-- Install script
+  
+  
