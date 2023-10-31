@@ -22,8 +22,6 @@ Developed out of a specific need to download models on remote servers via SSH, e
 
 CivitAI may house a myriad of models, ranging from the academically serious to the more leisurely. However, the CivitAI-CLI aims to be a tool of choice for anyone seeking a streamlined interface to this platform. 
 
-
-
 ## Table of Contents
 
 - [Installation](#installation)
@@ -150,7 +148,7 @@ Explore the various functionalities provided by CivitAI-CLI:
    Back to main menu
 ```
 
-### Model Display Example
+**Model Display Example**
 
 Models are displayed in the following format:
 
@@ -174,6 +172,16 @@ Models are displayed in the following format:
 -- Description --
 📝 Description: "♪ In case you ain't heard, I'm the Devil! I'm a real low-down, not on the level!" These are the results of my first experiments with a Google Colab LoRA maker. Early versions were made with PixAI and l...
 ```
+
+**Visual Showcase**
+
+Here's how CivitAI-CLI displays models in the iTerm2 terminal using `viu`:
+![Model Display in iTerm2 with viu](assets/example.png)
+
+And here's a display in a standard terminal using the ANSI display:
+![Model Display in Standard Terminal with ANSI](assets/ansi_example.png)
+
+---
 
 ## Current State and Functionalities
 
