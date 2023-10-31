@@ -18,7 +18,6 @@ The CivitAI-CLI is a command-line interface tool crafted to enhance user interac
 
 Developed out of a specific need to download models on remote servers via SSH, especially for servers running stable diffusion systems, the CivitAI-CLI addresses this niche requirement, ensuring efficient access to CivitAI's models regardless of the user's location.
 
----
 
 CivitAI may house a myriad of models, ranging from the academically serious to the more leisurely. However, the CivitAI-CLI aims to be a tool of choice for anyone seeking a streamlined interface to this platform. 
 
