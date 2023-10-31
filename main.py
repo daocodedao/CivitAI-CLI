@@ -330,7 +330,7 @@ class MainCLI:
                                         # This is a downloaded version
                                         downloaded_versions.append(version.get('name'))
 
-                        if len(model_versions) > 0:
+                        if len(model_versions) > 1:
                             version_choices = []
                             for ver in model_versions:
                                 version_name = ver.get('name', 'Unknown')
@@ -352,9 +352,15 @@ class MainCLI:
                                     break  # Break out of the loop if 'Back' is selected
                                 for version_id in selected_version_ids:
                                     self.selected_models_to_download.append((model_id, version_id))
+                        elif len(model_versions) == 1:
+                            # Automatically add the single version to the download list
+                            single_version = model_versions[0]
+                            single_version_id = single_version.get('id', None)
+                            self.selected_models_to_download.append((model_id, single_version_id))
+                            print(f"Automatically selected version {single_version.get('name', 'Unknown')} for {model.get('name', 'Unknown')} for download.")
                         else:
                             print(f"No versions available for {model.get('name', 'Unknown')}. Skipping.")
-                            
+                                                    
                     print("\033[94m\033[1mModels and versions selected for download. Continue browsing or initiate download.\033[0m")  # Blue and bold
                     continue
 
