@@ -149,9 +149,7 @@ Explore the various functionalities provided by CivitAI-CLI:
 ```
 
 **Model Display Example**
-
-Models are displayed in the following format:
-
+Displayed using text mode:
 ```
 🆔 ID: 157458
 🌐 URL: https://civitai.com/models/157458
@@ -181,7 +179,6 @@ Here's how CivitAI-CLI displays models in the iTerm2 terminal using `viu`:
 And here's a display in a standard terminal using the ANSI display:
 ![Model Display in Standard Terminal with ANSI](assets/ansi_example.png)
 
----
 
 ## Current State and Functionalities
 
