@@ -28,7 +28,7 @@ Ensure you have Python 3.6 or later and `pip` installed on your system. If not, 
 To quickly set up, you can use the following one-liner:
 
 ```bash
-git clone https://github.com/roadmaus/CivitAI-CLI.git && cd CivitAI-CLI && git checkout dev && [[ -x start.sh ]] || chmod +x start.sh && ./start.sh
+git clone https://github.com/roadmaus/CivitAI-CLI.git && cd CivitAI-CLI && [[ -x start.sh ]] || chmod +x start.sh && ./start.sh
 ```
 
 Or you can manually clone it:
