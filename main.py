@@ -1045,13 +1045,34 @@ class Downloader:
         try:
             global spin
             with tempfile.TemporaryDirectory() as temp_dir:
+                initial_url = f"https://civitai.com/api/download/models/{model_version_id}"
+                response = requests.get(initial_url, allow_redirects=False)
+
+                # Check if redirected to a login page
+                if 'login' in response.headers.get('Location', '').lower():
+                    # Model requires login, check for API key
+                    api_key = os.getenv('CIVITAI_API_KEY', '')
+                    if not api_key:
+                        print("Warning: Model requires login. No valid API key found. Cannot download this model.")
+                        return
+
+                    headers = {'Authorization': f'Bearer {api_key}'}
+                    response = requests.get(initial_url, headers=headers, allow_redirects=False)
+
+                    if 'login' in response.url.lower():
+                        print("Warning: Model requires login and cannot be downloaded even with the provided API key.")
+                        return
+
+                # Capture the final URL after redirection (if any)
+                redirect_url = response.headers.get('Location', initial_url)
+
+                # Step 2: Download using `aria2c`
                 aria2_command = [
                     "aria2c",
-                    f"https://civitai.com/api/download/models/{model_version_id}",
+                    redirect_url,
                     "--dir", temp_dir,
                     "--content-disposition"
                 ]
-                
                 if silent:
                     process = Popen(aria2_command, stdout=PIPE, stderr=PIPE)
                     process = Popen(aria2_command, stdout=PIPE, stderr=PIPE)
