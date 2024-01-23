@@ -95,9 +95,9 @@ After setting up and activating your venv, you can use CivitAI-CLI while keeping
 
 For the most up-to-date installation instructions for `viu`, please refer to the [official repository](https://github.com/atanunq/viu).
 
-## Environment Variables (Optional)
+## Environment Variables (Optional but very much recommended)
 
-To access additional features, set the `CIVITAI_API_KEY` environment variable with your API key:
+To access additional features and to download models that require a login, set the `CIVITAI_API_KEY` environment variable with your API key:
 
 ```bash
 export CIVITAI_API_KEY=your_api_key_here
