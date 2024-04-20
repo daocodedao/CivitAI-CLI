@@ -1442,13 +1442,12 @@ class ModelDisplay:
         #print(f"Image URL: {image_url}")
         if not self.text_only:
             nsfw_warning_displayed = False  
-
             nsfw_status = 'None'  # Initialize to a default value
+            attempt_counter = 0  # Initialize attempt counter
 
             for model_version in model.get('modelVersions', []):
                 for image in model_version.get('images', []):
                     nsfw_status = image.get('nsfw', 'None')  # Get NSFW status of the image
-
                     action = image_filter_settings.get(nsfw_status, 'allow') 
                     
                     if action == 'block':
@@ -1461,7 +1460,7 @@ class ModelDisplay:
                         print(f"⚠️ {nsfw_status} content is blockified")
                  
                     # Image fetching and displaying logic
-                    if image_url != 'N/A':
+                    if image_url != 'N/A' and attempt_counter < 2:
                         try:
                             # Fetch and save the image data
                             image_data = requests.get(image_url).content
@@ -1494,12 +1493,16 @@ class ModelDisplay:
                             print(f"🚫 Failed to fetch image from {image_url}")
                         except Image.UnidentifiedImageError:
                             print(f"🐟 Image from {image_url} not recognized")
+                            attempt_counter += 1  # Increment attempt counter after a failed attempt
                         except subprocess.CalledProcessError:
                             print("⚠️ Failed to run viu")
                         except Exception as e:
                             print(f"🚫 An unexpected error occurred: {str(e)}")
             # If the code reaches here, no image could be displayed
-            print("⚠️ No image could be displayed")
+            if attempt_counter >= 2:
+                print("⚠️ Image could not be displayed after 2 attempts.")
+            else:
+                print("⚠️ No image could be displayed")
             print(".")
 
 
